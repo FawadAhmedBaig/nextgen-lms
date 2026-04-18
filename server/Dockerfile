@@ -1,8 +1,8 @@
 # 1. Use a Node.js environment
 FROM node:20-alpine
 
-# 2. Install Chromium and dependencies for Puppeteer on Alpine
-# We add build-base for native modules and chromium for PDF generation
+# 2. Install Chromium and system dependencies for Puppeteer
+# Added dbus, udev, and mesa-gl for better headless stability
 RUN apk add --no-cache \
     chromium \
     nss \
@@ -10,19 +10,23 @@ RUN apk add --no-cache \
     harfbuzz \
     ca-certificates \
     ttf-freefont \
+    dbus \
+    udev \
+    mesa-gl \
     python3 \
     make \
     g++
 
-# 3. Tell Puppeteer to use the installed Chromium instead of trying to download it
+# 3. Puppeteer Environment Variables
+# Ensures Puppeteer points to the Alpine binary
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
     PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 
-# 4. Install dependencies
+# 4. Install dependencies (Clean install)
 COPY package*.json ./
-RUN npm install
+RUN npm install --omit=dev
 
 # 5. Copy source code
 COPY . .

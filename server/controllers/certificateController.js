@@ -156,14 +156,16 @@ export const generateCertificate = async (req, res) => {
 `;
 
     // 3. Launch Puppeteer
-    const browser = await puppeteer.launch({
-      executablePath: '/usr/bin/chromium-browser', // Path in the Alpine container
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage' // Helps with memory limits in Docker
-      ]
-    });
+// 3. Launch Puppeteer
+browser = await puppeteer.launch({ // ✅ Now it uses the 'let' variable from the top
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+  args: [
+    '--no-sandbox', 
+    '--disable-setuid-sandbox', 
+    '--disable-dev-shm-usage', 
+    '--disable-gpu'
+  ]
+});
 
     const page = await browser.newPage();
     await page.setContent(htmlContent, { waitUntil: 'networkidle0' });

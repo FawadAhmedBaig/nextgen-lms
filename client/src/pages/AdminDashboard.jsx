@@ -29,18 +29,18 @@ const fetchData = async () => {
     setLoading(true);
     try {
       // API instance handles Base URL and Bearer Token
-      const statsRes = await API.get('/api/auth/admin/stats');
+      const statsRes = await API.get('/auth/admin/stats');
       setStats(statsRes.data);
       
       if (activeTab === 'users') {
-        const usersRes = await API.get('/api/auth/admin/users');
+        const usersRes = await API.get('/auth/admin/users');
         setUsers(usersRes.data);
       } else if (activeTab === 'courses') {
-        const coursesRes = await API.get('/api/courses/all');
+        const coursesRes = await API.get('/courses/all');
         setCourses(coursesRes.data);
       } else if (activeTab === 'certificates') {
         try {
-          const certsRes = await API.get('/api/auth/admin/certificates');
+          const certsRes = await API.get('/auth/admin/certificates');
           setCertificates(certsRes.data);
         } catch (err) {
           setCertificates([]);
@@ -56,7 +56,7 @@ const fetchData = async () => {
 
   const handleApprove = async (userId) => {
     try {
-      await API.patch(`/api/auth/admin/users/${userId}/approve`, {});
+      await API.patch(`/auth/admin/users/${userId}/approve`, {});
       toast.success("Instructor Approved Successfully");
       fetchData();
     } catch (err) {
@@ -67,7 +67,7 @@ const fetchData = async () => {
   const handleStatusToggle = async (userId, currentStatus) => {
     const newStatus = currentStatus === 'active' ? 'blocked' : 'active';
     try {
-      await API.patch(`/api/auth/admin/users/${userId}/status`, { status: newStatus });
+      await API.patch(`/auth/admin/users/${userId}/status`, { status: newStatus });
       toast.success(`User ${newStatus === 'active' ? 'Unblocked' : 'Blocked'}`);
       fetchData();
     } catch (err) {
@@ -78,7 +78,7 @@ const fetchData = async () => {
   const handleDeleteCourse = async (courseId) => {
     if (!window.confirm("Admin Action: Permanently delete this course?")) return;
     try {
-      await API.delete(`/api/courses/${courseId}`);
+      await API.delete(`/courses/${courseId}`);
       toast.success("Course Removed");
       fetchData();
     } catch (err) {
