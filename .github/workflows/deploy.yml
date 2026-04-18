@@ -1,0 +1,26 @@
+name: Deploy NextGen LMS to Oracle Cloud
+
+on:
+  push:
+    branches:
+      - main  # Trigger only when pushing to the main branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SSH_KEY }}
+          script: |
+            cd ~/nextgen-lms
+            git pull origin main
+            # Only rebuild the service that changed to save time
+            docker-compose up --build -d
+            docker system prune -f
