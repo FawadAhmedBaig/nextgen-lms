@@ -14,7 +14,7 @@ import InstructorDashboard from './pages/InstructorDashboard';
 import ForgotPassword from './pages/forgotPassword';
 import ResetPassword from './pages/resetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
-import EditCourse from './pages/editCourse';
+import EditCourse from './pages/EditCourse';
 import CourseManagement from './pages/CourseManagement';
 import MyCourses from './pages/MyCourses';
 import AdminDashboard from './pages/AdminDashboard';
