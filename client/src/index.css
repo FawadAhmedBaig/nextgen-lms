@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+/* Typography and Markdown fixes */
+.markdown-content ul {
+    list-style-type: disc !important;
+    padding-left: 1.2rem !important;
+    margin: 0.5rem 0 !important;
+}
+
+.markdown-content ol {
+    list-style-type: decimal !important;
+    padding-left: 1.2rem !important;
+    margin: 0.5rem 0 !important;
+}
+
+.markdown-content p {
+    margin-bottom: 0.5rem !important;
+}
+
+.markdown-content strong {
+    font-weight: bold !important;
+    color: #1d4ed8; /* blue-700 */
+}
+
+/* Blinking Typing Cursor */
+.typing-cursor::after {
+    content: "▊";
+    display: inline-block;
+    vertical-align: middle;
+    animation: blink 0.8s infinite;
+    color: #3b82f6;
+    margin-left: 4px;
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}
+
+/* Hide default scrollbar for chat area */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+
+.markdown-content h1, .markdown-content h2 {
+    font-size: 1.1rem !important;
+    font-weight: 800 !important;
+    color: #1d4ed8 !important; /* blue-700 */
+    margin-top: 12px !important;
+    margin-bottom: 6px !important;
+    display: block !important;
+}
+
+.markdown-content strong {
+    font-weight: 800 !important;
+}

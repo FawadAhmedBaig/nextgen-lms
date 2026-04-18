@@ -1,0 +1,48 @@
+Since you are using Stripe for your FYP, you can use their official **Test Mode** card numbers to simulate different scenarios. This allows you to verify that your `Toaster` notifications and error handling are working correctly.
+
+### 1. Successful Transaction
+Use this to test your "Order Complete" flow. It will trigger a `succeeded` status.
+
+| Field | Value |
+| :--- | :--- |
+| **Card Number** | `4242 4242 4242 4242` |
+| **Expiry Date** | Any future date (e.g., `12/30`) |
+| **CVC** | `123` |
+| **ZIP Code** | `12345` |
+
+---
+
+### 2. Declined / Invalid Transactions
+Use these to test if your `toast.error` messages are working. Each card will trigger a specific error returned by the `result.error` object in your `Checkout.jsx`.
+
+| Scenario | Card Number | Resulting Error Message |
+| :--- | :--- | :--- |
+| **Generic Decline** | `4000 0566 5441 7549` | "Your card was declined." |
+| **Insufficient Funds** | `4000 0510 0000 0510` | "Your card has insufficient funds." |
+| **Expired Card** | `4000 0000 0000 0069` | "Your card has expired." |
+| **Incorrect CVC** | `4000 0000 0000 0127` | "Your card's security code is incorrect." |
+| **Processing Error** | `4000 0200 1100 0018` | "An error occurred while processing the card." |
+
+---
+
+### 3. How to verify the logic in `CheckoutForm`
+When you use an **Invalid Card**, your current code's `catch` block or the `result.error` check will trigger:
+
+```javascript
+if (result.error) {
+  // This will show "Your card has expired." (for example) for 1 second
+  toast.error(result.error.message, { id: loadingToast });
+}
+```
+
+### Pro-Tip for your Project:
+Keep your **Stripe Dashboard** open on the "Payments" tab while testing.
+* A **Declined** card will show up in the logs as "Failed" with the specific reason.
+* A **Successful** card will show up as "Succeeded" and include the `courseId` in the **Metadata** section that we set up in the backend.
+
+---
+
+### What's next?
+Now that we have the payment working and the cards to test it, we need to handle the **Post-Payment UI**. 
+
+**Would you like me to provide the code for the `OrderComplete.jsx` page with a "Start Learning" button and a receipt summary?**
