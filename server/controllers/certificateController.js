@@ -156,9 +156,13 @@ export const generateCertificate = async (req, res) => {
 `;
 
     // 3. Launch Puppeteer
-    browser = await puppeteer.launch({
-      headless: "new",
-      args: ["--no-sandbox", "--disable-setuid-sandbox"]
+    const browser = await puppeteer.launch({
+      executablePath: '/usr/bin/chromium-browser', // Path in the Alpine container
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage' // Helps with memory limits in Docker
+      ]
     });
 
     const page = await browser.newPage();

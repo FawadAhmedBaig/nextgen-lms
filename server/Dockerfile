@@ -1,20 +1,34 @@
-# Use a lightweight Node.js environment
+# 1. Use a Node.js environment
 FROM node:20-alpine
+
+# 2. Install Chromium and dependencies for Puppeteer on Alpine
+# We add build-base for native modules and chromium for PDF generation
+RUN apk add --no-cache \
+    chromium \
+    nss \
+    freetype \
+    harfbuzz \
+    ca-certificates \
+    ttf-freefont \
+    python3 \
+    make \
+    g++
+
+# 3. Tell Puppeteer to use the installed Chromium instead of trying to download it
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true \
+    PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium-browser
 
 WORKDIR /app
 
-# Install build tools for native dependencies (fixing the syntax error)
-RUN apk add --no-cache python3 make g++
-
-# Install dependencies
+# 4. Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy source code and production .env
+# 5. Copy source code
 COPY . .
 
-# Expose the API port
+# 6. Expose the API port
 EXPOSE 5000
 
-# Start the server using the compiled index.js
+# 7. Start the server
 CMD ["npm", "start"]
