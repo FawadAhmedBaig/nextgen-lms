@@ -1,18 +1,4 @@
-name: Deploy NextGen LMS to Oracle Cloud
-
-on:
-  push:
-    branches:
-      - main  # Trigger only when pushing to the main branch
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
-
-      - name: Deploy via SSH
+- name: Deploy via SSH
         uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.HOST }}
@@ -21,6 +7,18 @@ jobs:
           script: |
             cd ~/nextgen-lms
             git pull origin main
-            # Only rebuild the service that changed to save time
-            docker-compose up --build -d
+            
+            # 1. Stop everything to free up RAM
+            docker-compose down --remove-orphans
+            
+            # 2. Build and start Backend first
+            docker-compose up --build -d backend
+            
+            # 3. Wait 10 seconds for the CPU to cool down
+            sleep 10
+            
+            # 4. Build and start Frontend
+            docker-compose up --build -d frontend
+            
+            # 5. Cleanup
             docker system prune -f
