@@ -29,7 +29,7 @@ const server = http.createServer(app); // Create HTTP server
 const io = new Server(server, {
   cors: {
     // Allows both local development and your new OCI domain
-    origin: ["http://localhost:5173", "http://nextgen-lms-fawad.duckdns.org"],
+    origin: ["http://localhost:5173", "http://nextgen-lms.duckdns.org"],
     methods: ["GET", "POST"],
     credentials: true
   }
@@ -38,7 +38,7 @@ const io = new Server(server, {
 // Middleware
 // Middleware
 app.use(cors({
-  origin: ["http://localhost:5173", "http://nextgen-lms-fawad.duckdns.org"],
+  origin: ["http://localhost:5173", "http://nextgen-lms.duckdns.org"],
   credentials: true
 }));
 app.use(express.json());
