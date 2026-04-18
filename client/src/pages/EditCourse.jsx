@@ -12,7 +12,7 @@ const EditCourse = () => {
 const fetchCourse = async () => {
       try {
         // Fetches from http://152.67.7.123:5000/api/courses/all in production
-        const res = await API.get('/api/courses/all');
+        const res = await API.get('/courses/all');
         const course = res.data.find(c => c._id === id);
         setFormData(course);
       } catch (err) {
@@ -26,7 +26,7 @@ const fetchCourse = async () => {
     e.preventDefault();
     try {
       // API instance handles the Auth header so only the instructor can update
-      await API.put(`/api/courses/${id}`, formData);
+      await API.put(`/courses/${id}`, formData);
       toast.success("Course updated successfully!");
       setTimeout(() => navigate('/instructor-dashboard'), 1500);
     } catch (err) {

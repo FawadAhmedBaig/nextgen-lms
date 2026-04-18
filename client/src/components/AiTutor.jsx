@@ -52,7 +52,7 @@ const AiTutor = ({ courseId, isQuizActive }) => {
 
 try {
             // No need to manually grab token or write the full URL
-            const { data } = await API.post('/api/ai/ask', 
+            const { data } = await API.post('/ai/ask', 
                 { 
                     question: currentInput, 
                     courseId, 

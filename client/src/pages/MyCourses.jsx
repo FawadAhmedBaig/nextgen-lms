@@ -19,7 +19,7 @@ const fetchMyCourses = async () => {
         }
 
         // The API instance handles the Base URL (DuckDNS) and Auth header
-        const res = await API.get('/api/users/my-courses');
+        const res = await API.get('/users/my-courses');
 
         setCourses(res.data);
       } catch (err) {

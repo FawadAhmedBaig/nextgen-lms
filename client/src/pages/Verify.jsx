@@ -31,7 +31,7 @@ try {
       if (data.exists) {
         // Step 2: Web2 Data Resolution (Direct to OCI Production)
         // Using the API instance with the relative path
-        const resolveRes = await API.get(`/api/users/public-resolve/${data.studentId}/${data.courseId}`);
+        const resolveRes = await API.get(`/users/public-resolve/${data.studentId}/${data.courseId}`);
         
         const formattedDate = new Date(Number(data.timestamp) * 1000).toLocaleDateString('en-US', {
           year: 'numeric', month: 'long', day: 'numeric'

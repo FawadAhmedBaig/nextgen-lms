@@ -15,7 +15,7 @@ const CourseManagement = () => {
 const fetchMyCourses = async () => {
     try {
       // API instance handles the Base URL (Oracle IP) automatically
-      const res = await API.get('/api/courses/all');
+      const res = await API.get('/courses/all');
       const myCourses = res.data.filter(c => c.instructor.name === user.name);
       setCourses(myCourses);
     } catch (err) {
@@ -27,7 +27,7 @@ const fetchMyCourses = async () => {
     if (window.confirm("Are you sure you want to delete this course?")) {
       try {
         // Relative path used; API instance injects the Auth header
-        await API.delete(`/api/courses/${id}`);
+        await API.delete(`/courses/${id}`);
         toast.success("Course deleted");
         fetchMyCourses();
       } catch (err) {

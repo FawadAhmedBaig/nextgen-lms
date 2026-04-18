@@ -11,7 +11,7 @@ useEffect(() => {
   const fetchPopularCourses = async () => {
 try {
       // Use the API instance with the relative path
-      const { data } = await API.get('/api/courses/popular');
+      const { data } = await API.get('/courses/popular');
       setCourses(data);
     } catch (err) {
       console.error("Failed to fetch popular courses", err);

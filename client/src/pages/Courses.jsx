@@ -94,7 +94,7 @@ const fetchData = async () => {
         setLoading(true);
         try {
             // 1. Fetch all courses (Public)
-            const res = await API.get('/api/courses/all');
+            const res = await API.get('/courses/all');
             setCourses(res.data);
 
             const token = localStorage.getItem('token');
@@ -107,8 +107,8 @@ const fetchData = async () => {
                 if (userId && userId.length === 24) {
                     // 2. Parallel fetch for personal data
                     const [enrollRes, recRes] = await Promise.all([
-                        API.get('/api/users/my-courses'),
-                        API.get(`/api/courses/recommendations/${userId}`)
+                        API.get('/users/my-courses'),
+                        API.get(`/courses/recommendations/${userId}`)
                     ]);
 
                     setEnrolledCourseIds(new Set(enrollRes.data.map(c => c._id)));

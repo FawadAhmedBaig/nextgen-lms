@@ -34,7 +34,7 @@ try {
       if (imageFile) formData.append('image', imageFile);
 
       // Using the API instance with the relative path
-      const res = await API.put(`/api/auth/update-profile`, formData, {
+      const res = await API.put(`/auth/update-profile`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

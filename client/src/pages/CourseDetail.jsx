@@ -14,7 +14,7 @@ export default function CourseDetail() {
     const fetchCourse = async () => {
       try {
         // Using the API instance with a relative path
-        const { data } = await API.get(`/api/courses/${id}`);
+        const { data } = await API.get(`/courses/${id}`);
         setCourse(data);
       } catch (err) {
         console.error("Fetch Error:", err);
@@ -43,7 +43,7 @@ export default function CourseDetail() {
       const loadingToast = toast.loading("Processing your enrollment...");
       try {
         // No need to manually pass headers or full URL
-        await API.post(`/api/users/enroll/${course._id}`, {});
+        await API.post(`/users/enroll/${course._id}`, {});
 
         toast.success("Enrolled Successfully!", { id: loadingToast });
         

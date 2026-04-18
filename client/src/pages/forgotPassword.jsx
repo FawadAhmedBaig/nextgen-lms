@@ -12,7 +12,7 @@ const ForgotPassword = () => {
     setLoading(true);
     try {
       // Use the API instance with the relative path
-      const res = await API.post('/api/auth/forgot-password', { email });
+      const res = await API.post('/auth/forgot-password', { email });
       toast.success(res.data.message || "Reset link sent to your email!");
     } catch (err) {
       toast.error(err.response?.data?.message || "Something went wrong");

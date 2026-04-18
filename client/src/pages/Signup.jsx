@@ -20,7 +20,7 @@ const Signup = () => {
     e.preventDefault();
 try {
       // API instance points to http://nextgen-lms-fawad.duckdns.org
-      await API.post('/api/auth/signup', {
+      await API.post('/auth/signup', {
         name: `${formData.firstName} ${formData.lastName}`,
         email: formData.email,
         password: formData.password,
@@ -38,7 +38,7 @@ try {
       const googleData = jwtDecode(credentialResponse.credential);
 
       // Unified Google login/signup endpoint
-      const res = await API.post('/api/auth/google-login', {
+      const res = await API.post('/auth/google-login', {
         email: googleData.email,
         name: googleData.name,
         avatar: googleData.picture,

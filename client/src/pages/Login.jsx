@@ -20,7 +20,7 @@ const Login = () => {
     
 try {
       // Hits http://152.67.7.123:5000/api/auth/login in production
-      const response = await API.post('/api/auth/login', { email, password });
+      const response = await API.post('/auth/login', { email, password });
       
       if (response.data.user) {
         localStorage.setItem('token', response.data.token);
@@ -53,7 +53,7 @@ try {
 try {
       const googleData = jwtDecode(credentialResponse.credential);
       // Hits the Google sync endpoint on your Oracle server
-      const res = await API.post('/api/auth/google-login', {
+      const res = await API.post('/auth/google-login', {
         email: googleData.email,
         name: googleData.name,
         avatar: googleData.picture,

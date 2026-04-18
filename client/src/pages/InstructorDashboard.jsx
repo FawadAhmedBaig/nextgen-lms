@@ -45,7 +45,7 @@ const fetchDashboardData = async () => {
 
 try {
       // 1. Fetch Instructor Stats
-      const statsRes = await API.get(`/api/instructor/stats?instructorId=${instructorId}`);
+      const statsRes = await API.get(`/instructor/stats?instructorId=${instructorId}`);
       
       const data = statsRes.data;
       const updatedStats = stats.map(s => ({
@@ -55,7 +55,7 @@ try {
       setStats(updatedStats);
 
       // 2. Fetch Student Progress
-      const progressRes = await API.get(`/api/instructor/student-progress?instructorId=${instructorId}`);
+      const progressRes = await API.get(`/instructor/student-progress?instructorId=${instructorId}`);
       setStudentProgress(progressRes.data);
     } catch (err) {
       console.error("Dashboard sync error", err);
@@ -76,7 +76,7 @@ try {
 
 const fetchMyCourses = async () => {
 try {
-    const res = await API.get(`/api/courses/all?t=${Date.now()}`);
+    const res = await API.get(`/courses/all?t=${Date.now()}`);
     
     const currentUserId = user?.id || user?._id;
     const currentUserName = user?.name;
@@ -181,7 +181,7 @@ try {
     setEditingCourseId(course._id);
     setCourseViewMode('edit');
     try {
-      const res = await API.get(`/api/courses/${course._id}/live-sessions`);
+      const res = await API.get(`/courses/${course._id}/live-sessions`);
       setExistingLiveSessions(res.data);
     } catch (e) { console.log("No live sessions found."); }
   };
@@ -237,18 +237,18 @@ try {
       
       let courseId = editingCourseId;
       if (courseViewMode === 'edit') {
-        await API.put(`/api/courses/${editingCourseId}`, data, {
+        await API.put(`/courses/${editingCourseId}`, data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
       } else {
-        const res = await API.post('/api/courses/create', data, {
+        const res = await API.post('/courses/create', data, {
           headers: { 'Content-Type': 'multipart/form-data' }
         });
         courseId = res.data._id;
       }
       
       if (quizData && quizData.questions) {
-          await API.post('/api/quizzes/create', {
+          await API.post('/quizzes/create', {
             course: courseId, title: quizData.title || "Final Quiz",
             questions: quizData.questions, passingScore: quizData.passingScore || 80
           });
@@ -270,12 +270,12 @@ try {
     try {
       let res;
       if (editingSessionId) {
-        res = await API.post(`/api/courses/${courseId}/live-session/${editingSessionId}`, newLiveSession, {
+        res = await API.post(`/courses/${courseId}/live-session/${editingSessionId}`, newLiveSession, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success("Live Session Updated!");
       } else {
-        res = await API.post(`/api/courses/${courseId}/schedule-live`, newLiveSession, {
+        res = await API.post(`/courses/${courseId}/schedule-live`, newLiveSession, {
           headers: { Authorization: `Bearer ${token}` }
         });
         toast.success("Live Session Scheduled!");
@@ -296,7 +296,7 @@ try {
   const handleDeleteLiveSession = async (sessionId) => {
     if (!window.confirm("Remove this live session?")) return;
     try {
-      await API.delete(`/api/courses/${editingCourseId}/live-session/${sessionId}`, {
+      await API.delete(`/courses/${editingCourseId}/live-session/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setExistingLiveSessions(existingLiveSessions.filter(s => s._id !== sessionId));
@@ -437,7 +437,7 @@ try {
                       <div className="flex grid grid-cols-3 md:flex gap-2 w-full md:w-auto">
                         <button onClick={() => navigate(`/course-view/${course._id}`)} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">View</button>
                         <button onClick={() => handleEditClick(course)} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">Edit</button>
-                        <button onClick={() => { if(window.confirm("Permanently delete?")) API.delete(`/api/courses/${course._id}`).then(() => fetchMyCourses())}} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">Delete</button>
+                        <button onClick={() => { if(window.confirm("Permanently delete?")) API.delete(`/courses/${course._id}`).then(() => fetchMyCourses())}} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">Delete</button>
                       </div>
                     </div>
                   ))}

@@ -24,7 +24,7 @@ const Profile = () => {
   const fetchUserData = async () => {
 try {
       // API instance handles Base URL and Bearer token automatically
-      const res = await API.get('/api/auth/me');
+      const res = await API.get('/auth/me');
       
       setUser(res.data);
       setTempName(res.data.name);
@@ -60,7 +60,7 @@ try {
       if (newFile) formData.append('image', newFile);
 
       // Using the API instance for the PUT request
-      const res = await API.put(`/api/auth/update-profile`, formData, {
+      const res = await API.put(`/auth/update-profile`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

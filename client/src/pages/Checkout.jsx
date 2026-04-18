@@ -28,7 +28,7 @@ const CheckoutForm = ({ course }) => {
 
 try {
       // 1. Create Payment Intent via API instance
-      const { data: { clientSecret } } = await API.post('/api/payments/create-intent', {
+      const { data: { clientSecret } } = await API.post('/payments/create-intent', {
         amount: Math.round(totalPrice * 100),
         courseId: course._id
       });
@@ -45,7 +45,7 @@ try {
       } else {
         if (result.paymentIntent.status === 'succeeded') {
           // 3. Complete Enrollment via API instance
-          await API.post(`/api/users/enroll/${course._id}`, {});
+          await API.post(`/users/enroll/${course._id}`, {});
 
           toast.success("Enrollment Successful!", { id: loadingToast });
 
@@ -147,7 +147,7 @@ const Checkout = () => {
 // 2. Fallback: Fetch from DB using API instance
       else if (location.state?.courseId) {
         try {
-          const { data } = await API.get(`/api/courses/${location.state.courseId}`);
+          const { data } = await API.get(`/courses/${location.state.courseId}`);
           setCourse(data);
           setLoading(false);
         } catch (err) {

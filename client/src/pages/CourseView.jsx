@@ -116,7 +116,7 @@ const fetchData = async () => {
         setUser(storedUser);
         
         // 1. Fetch Course Data
-        const res = await API.get(`/api/courses/all`);
+        const res = await API.get(`/courses/all`);
         const currentCourse = res.data.find(c => c._id === id);
         
         if (currentCourse) setCourse(currentCourse);
@@ -124,7 +124,7 @@ const fetchData = async () => {
 
         // 2. Fetch User Progress (Auth header is automatic via API instance)
         try {
-          const progRes = await API.get(`/api/users/course-progress/${id}`);
+          const progRes = await API.get(`/users/course-progress/${id}`);
           if (progRes.data) {
             setCompletedLessons(progRes.data.completedLessons || []);
             if (progRes.data.isCompleted) setQuizResult({ score: 100, passed: true });
@@ -133,7 +133,7 @@ const fetchData = async () => {
 
         // 3. Fetch Course Quiz
         try {
-          const quizRes = await API.get(`/api/quizzes/course/${id}`);
+          const quizRes = await API.get(`/quizzes/course/${id}`);
           setQuiz(quizRes.data);
         } catch (qErr) { console.error("Final Quiz missing"); }
         
@@ -199,7 +199,7 @@ const fetchData = async () => {
 
       try {
         // API instance injects the Auth header
-        await API.patch(`/api/users/update-progress/${id}`, 
+        await API.patch(`/users/update-progress/${id}`, 
           { completedLessons: updatedLessons, progress: newProgress }
         );
       } catch (err) { console.error("Sync error"); }
@@ -216,7 +216,7 @@ const fetchData = async () => {
     setQuizResult({ score, passed });
     if (passed) {
       toast.success(`Exam Passed!`);
-      await API.patch(`/api/users/update-progress/${id}`, { isCompleted: true });
+      await API.patch(`/users/update-progress/${id}`, { isCompleted: true });
     } else toast.error(`Scored ${score}%. Need 80%.`);
   };
 
@@ -227,7 +227,7 @@ const fetchData = async () => {
       if (!currentUserId) return toast.error("Re-login required.", { id: toastId });
 
       // Using the API instance for the blockchain generation call
-      const response = await API.post('/api/certificate/generate', {
+      const response = await API.post('/certificate/generate', {
         userId: currentUserId, userName: user.name, courseTitle: course.title,
         courseId: course._id, date: new Date().toLocaleDateString()
       }, {

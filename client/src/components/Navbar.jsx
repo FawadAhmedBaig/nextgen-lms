@@ -29,7 +29,7 @@ export default function Navbar() {
       if (!token) return;
 
       // API instance already has the baseURL and Auth header injected
-      const res = await API.get('/api/notifications');
+      const res = await API.get('/notifications');
       
       setNotifications(res.data);
       setUnreadCount(res.data.filter(n => !n.isRead).length);
@@ -90,7 +90,7 @@ export default function Navbar() {
   const markAsRead = async (id) => {
     try {
       // Use the API instance with the relative path and empty object for PATCH body
-      await API.patch(`/api/notifications/${id}/read`, {});
+      await API.patch(`/notifications/${id}/read`, {});
       fetchNotifications();
     } catch (err) {
       console.error("Error marking notification as read", err);

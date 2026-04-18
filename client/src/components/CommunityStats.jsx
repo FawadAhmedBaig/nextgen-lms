@@ -13,7 +13,7 @@ export default function CommunityStats() {
     const fetchStats = async () => {
       try {
         // We now use the relative path. API instance handles the rest.
-        const { data } = await API.get('/api/courses/public-stats');
+        const { data } = await API.get('/courses/public-stats');
         
         setCounts({
           students: data.students > 0 ? data.students : "1,200+", 
