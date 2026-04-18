@@ -18,6 +18,8 @@ jobs:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
+          timeout: 60s
+          command_timeout: 30m
           script: |
             cd ~/nextgen-lms
             git pull origin main
