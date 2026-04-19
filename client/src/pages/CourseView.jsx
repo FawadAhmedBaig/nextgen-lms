@@ -47,7 +47,7 @@ const VideoPlayer = ({ videoUrl, onComplete }) => {
     };
   }, [videoUrl]);
 
-  return <div className="w-full h-full"><div ref={containerRef}></div></div>;
+  return <div className="w-full h-full aspect-video"><div ref={containerRef}></div></div>;
 };
 
 const CourseView = () => {
@@ -67,7 +67,6 @@ const CourseView = () => {
   const [expandedModules, setExpandedModules] = useState({ 0: true });
   const [moduleQuizAnswers, setModuleQuizAnswers] = useState({});
   const [moduleQuizResult, setModuleQuizResult] = useState(null);
-  
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   const getAllItems = () => {
@@ -110,19 +109,15 @@ const CourseView = () => {
   };
 
   useEffect(() => {
-const fetchData = async () => {
+    const fetchData = async () => {
       try {
         const storedUser = JSON.parse(localStorage.getItem('user'));
         setUser(storedUser);
-        
-        // 1. Fetch Course Data
         const res = await API.get(`/courses/all`);
         const currentCourse = res.data.find(c => c._id === id);
-        
         if (currentCourse) setCourse(currentCourse);
         else return navigate('/courses');
 
-        // 2. Fetch User Progress (Auth header is automatic via API instance)
         try {
           const progRes = await API.get(`/users/course-progress/${id}`);
           if (progRes.data) {
@@ -131,12 +126,10 @@ const fetchData = async () => {
           }
         } catch (e) { console.log("New enrollment."); }
 
-        // 3. Fetch Course Quiz
         try {
           const quizRes = await API.get(`/quizzes/course/${id}`);
           setQuiz(quizRes.data);
         } catch (qErr) { console.error("Final Quiz missing"); }
-        
       } catch (err) {
         toast.error("Initialization failed");
       } finally {
@@ -156,16 +149,12 @@ const fetchData = async () => {
     window.scrollTo(0, 0);
     const mainframe = document.querySelector('.flex-1.overflow-y-auto');
     if (mainframe) mainframe.scrollTop = 0;
-  }, [id]);
+  }, [id, activeLesson]);
 
   useEffect(() => {
     const allItems = getAllItems();
     const currentItem = allItems[activeLesson];
-    if (currentItem?.type === 'quiz' || (activeTab === 'certificate' && quizStarted)) {
-      setIsQuizOpen(true);
-    } else {
-      setIsQuizOpen(false);
-    }
+    setIsQuizOpen(currentItem?.type === 'quiz' || (activeTab === 'certificate' && quizStarted));
   }, [activeLesson, activeTab, quizStarted, course]);
 
   const moveToNext = () => {
@@ -192,16 +181,11 @@ const fetchData = async () => {
       const updatedLessons = [...completedLessons, activeLesson];
       setCompletedLessons(updatedLessons);
       toast.success("Progress Saved!", { icon: '👏' });
-      
       const allItems = getAllItems();
       const rawProgress = (updatedLessons.length / allItems.length) * 100;
       const newProgress = Math.min(Math.round(rawProgress), 100);
-
       try {
-        // API instance injects the Auth header
-        await API.patch(`/users/update-progress/${id}`, 
-          { completedLessons: updatedLessons, progress: newProgress }
-        );
+        await API.patch(`/users/update-progress/${id}`, { completedLessons: updatedLessons, progress: newProgress });
       } catch (err) { console.error("Sync error"); }
       setTimeout(() => { moveToNext(); }, 1500);
     }
@@ -225,15 +209,12 @@ const fetchData = async () => {
     try {
       const currentUserId = user?._id || user?.id;
       if (!currentUserId) return toast.error("Re-login required.", { id: toastId });
-
-      // Using the API instance for the blockchain generation call
       const response = await API.post('/certificate/generate', {
         userId: currentUserId, userName: user.name, courseTitle: course.title,
         courseId: course._id, date: new Date().toLocaleDateString()
       }, {
-        responseType: 'blob', timeout: 120000 // Long timeout for blockchain tx
+        responseType: 'blob', timeout: 120000 
       });
-
       const blob = new Blob([response.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -251,9 +232,7 @@ const fetchData = async () => {
 
   const allItems = getAllItems();
   const currentItem = allItems[activeLesson];
-  const progressPercentage = allItems.length > 0 
-  ? Math.min(Math.round((completedLessons.length / allItems.length) * 100), 100) 
-  : 0;
+  const progressPercentage = allItems.length > 0 ? Math.min(Math.round((completedLessons.length / allItems.length) * 100), 100) : 0;
   const isCourseComplete = progressPercentage === 100;
 
   if (loading || !course) return <div className="h-screen flex items-center justify-center font-black text-slate-300 animate-pulse">Initializing Workspace...</div>;
@@ -280,11 +259,7 @@ const fetchData = async () => {
       </div>
 
       {/* CURRICULUM SIDEBAR */}
-      <div className={`
-        fixed inset-0 lg:relative lg:translate-x-0 transform transition-transform duration-300 z-[45] bg-white
-        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
-        w-full sm:w-80 lg:w-80 border-r border-slate-100 flex flex-col shadow-sm
-      `}>
+      <div className={`fixed inset-0 lg:relative lg:translate-x-0 transform transition-transform duration-300 z-[45] bg-white ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} w-full sm:w-80 lg:w-80 border-r border-slate-100 flex flex-col shadow-sm`}>
         <div className="p-6 border-b border-slate-50 mt-14 lg:mt-0">
           <h2 className="text-xl font-extrabold text-slate-900 leading-tight mb-4">{course.title}</h2>
           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest mb-2 text-slate-400">
@@ -306,7 +281,6 @@ const fetchData = async () => {
                 </div>
                 <span className={`text-slate-300 transition-transform duration-500 ${expandedModules[mIdx] ? 'rotate-180' : ''}`}>▼</span>
               </button>
-              
               {expandedModules[mIdx] && (
                 <div className="animate-in slide-in-from-top-2 duration-300">
                   {module.items.map((item, iIdx) => {
@@ -314,13 +288,8 @@ const fetchData = async () => {
                     const isLocked = globalIndex > 0 && !completedLessons.includes(globalIndex - 1);
                     const isActive = activeLesson === globalIndex;
                     const isDone = completedLessons.includes(globalIndex);
-
                     return (
-                      <div 
-                        key={globalIndex} 
-                        onClick={() => handleItemClick(globalIndex, isLocked)}
-                        className={`px-6 py-4 flex items-center justify-between transition-all border-l-4 ${isActive ? 'bg-blue-50 border-blue-600' : 'border-transparent'} ${isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'}`}
-                      >
+                      <div key={globalIndex} onClick={() => handleItemClick(globalIndex, isLocked)} className={`px-6 py-4 flex items-center justify-between transition-all border-l-4 ${isActive ? 'bg-blue-50 border-blue-600' : 'border-transparent'} ${isLocked ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-50'}`}>
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                            <span className={`shrink-0 ${isActive ? 'text-blue-600' : 'text-slate-400'}`}>{isLocked ? '🔒' : getItemIcon(item.type)}</span>
                            <div className="min-w-0 flex-1">
@@ -336,7 +305,6 @@ const fetchData = async () => {
               )}
             </div>
           ))}
-
           <div className={`mt-6 mx-4 p-5 rounded-[2rem] border transition-all mb-10 ${isCourseComplete ? 'bg-green-50 border-green-200' : 'bg-slate-50 border-slate-100 opacity-60'}`}>
             <div className="flex items-center gap-3 mb-4">
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${isCourseComplete ? 'bg-green-600 text-white shadow-lg' : 'bg-slate-200 text-slate-400'}`}>
@@ -376,25 +344,26 @@ const fetchData = async () => {
           </div>
         </div>
 
-        <div className="p-4 sm:p-8 max-w-5xl mx-auto w-full">
-          <div className="w-full relative bg-black rounded-3xl lg:rounded-[2.5rem] shadow-2xl overflow-hidden mb-6 sm:mb-10 border-4 sm:border-8 border-white aspect-video lg:min-h-[550px]">
+        <div className="p-2 sm:p-8 max-w-5xl mx-auto w-full flex-1 flex flex-col">
+          {/* RESPONSIVE CONTENT CONTAINER */}
+          <div className="w-full relative bg-black rounded-2xl lg:rounded-[2.5rem] shadow-2xl overflow-hidden mb-6 sm:mb-10 border-2 sm:border-8 border-white flex flex-col min-h-[450px] lg:min-h-[550px]">
              {currentItem?.type === 'video' ? (
                 <VideoPlayer key={currentItem.contentUrl} videoUrl={currentItem.contentUrl} onComplete={handleAutoProgress} />
              ) : currentItem?.type === 'pdf' ? (
-                <iframe key={currentItem.contentUrl} src={getEmbedLink(currentItem.contentUrl)} className="w-full h-full min-h-[400px] lg:min-h-[600px] border-none" allow="autoplay" title="pdf-viewer" />
+                <iframe key={currentItem.contentUrl} src={getEmbedLink(currentItem.contentUrl)} className="w-full flex-1 min-h-[500px] lg:min-h-[600px] border-none bg-white" allow="autoplay" title="pdf-viewer" />
              ) : currentItem?.type === 'quiz' ? (
-                <div className="w-full h-full bg-[#0F172A] p-4 sm:p-10 overflow-y-auto text-white flex flex-col text-left min-h-[400px]">
+                <div className="w-full flex-1 bg-[#0F172A] p-4 sm:p-10 overflow-y-auto text-white flex flex-col text-left">
                   <h3 className="text-lg sm:text-xl font-black mb-6 text-blue-400">Module Assessment</h3>
-                  <div className="flex-1">
+                  <div className="flex-1 space-y-4 sm:space-y-8 pb-10">
                     {currentItem.questions?.map((q, qIdx) => (
-                      <div key={qIdx} className="mb-6 sm:mb-8 bg-white/5 p-4 sm:p-6 rounded-2xl border border-white/10">
+                      <div key={qIdx} className="bg-white/5 p-4 sm:p-6 rounded-2xl border border-white/10">
                         <p className="font-bold mb-4 text-sm sm:text-base">{qIdx + 1}. {q.questionText}</p>
                         <div className="grid grid-cols-1 gap-3">
                           {q.options.map((opt, oIdx) => (
                             <button 
                               key={oIdx} 
                               onClick={() => setModuleQuizAnswers({...moduleQuizAnswers, [qIdx]: oIdx})}
-                              className={`p-4 rounded-xl border text-xs sm:text-sm text-left transition-all font-bold cursor-pointer ${moduleQuizAnswers[qIdx] === oIdx ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white/10 border-white/10 hover:bg-white/20'}`}
+                              className={`p-3 sm:p-4 rounded-xl border text-xs sm:text-sm text-left transition-all font-bold cursor-pointer ${moduleQuizAnswers[qIdx] === oIdx ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white/10 border-white/10 hover:bg-white/20'}`}
                             >
                               {opt}
                             </button>
@@ -402,15 +371,18 @@ const fetchData = async () => {
                         </div>
                       </div>
                     ))}
+                    {/* FOOTER BUTTON FOR QUIZ - SCROLLABLE CONTENT */}
+                    <button onClick={() => {
+                      let correct = 0;
+                      currentItem.questions.forEach((q, idx) => { if(moduleQuizAnswers[idx] === q.correctOptionIndex) correct++; });
+                      const score = Math.round((correct / currentItem.questions.length) * 100);
+                      setModuleQuizResult(score);
+                      if(score >= 80) handleAutoProgress();
+                      else toast.error("80% score required to pass.");
+                    }} className="w-full bg-blue-600 py-4 rounded-2xl font-black text-sm uppercase shadow-xl hover:bg-blue-700 active:scale-95 transition-all sticky bottom-0 z-10">
+                      Submit Assessment
+                    </button>
                   </div>
-                  <button onClick={() => {
-                    let correct = 0;
-                    currentItem.questions.forEach((q, idx) => { if(moduleQuizAnswers[idx] === q.correctOptionIndex) correct++; });
-                    const score = Math.round((correct / currentItem.questions.length) * 100);
-                    setModuleQuizResult(score);
-                    if(score >= 80) handleAutoProgress();
-                    else toast.error("80% score required to pass.");
-                  }} className="w-full bg-blue-600 py-4 rounded-2xl font-black text-sm uppercase mt-6 cursor-pointer hover:bg-blue-700 active:scale-95 transition-all">Submit Assessment</button>
                 </div>
              ) : null}
           </div>
