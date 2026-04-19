@@ -6,19 +6,17 @@ services:
     restart: always
     ports:
       - "5000:5000"
-    # 🔥 This loads all your keys (Gemini, Stripe, Polygon, etc.) from your .env file
     env_file:
       - ./server/.env
-    # We no longer depend on a local 'mongo' service because you use Atlas
-    # depends_on is removed unless you have other local services
 
   frontend:
     build: ./client
     restart: always
     ports:
       - "80:80"
-    # Ensure the frontend knows where the backend is
+      - "443:443" # 🔥 OPEN PORT 443 FOR HTTPS
     depends_on:
       - backend
-
-# We removed the 'volumes' section because Atlas manages its own storage
+    # 🔥 MOUNT THE SSL CERTIFICATES FROM THE HOST
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
