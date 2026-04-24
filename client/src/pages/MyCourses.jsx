@@ -42,7 +42,6 @@ const fetchMyCourses = async () => {
   return (
     // Adjusted pt-24/32 to account for sticky navbar and added responsive px
     <div className="min-h-screen bg-[#F8FAFC] pt-8 md:pt-12 pb-12 md:pb-20 font-['Plus_Jakarta_Sans']">
-      <Toaster />
       <div className="max-w-7xl mx-auto px-4 md:px-8">
         
         {/* Header: Centered on mobile */}

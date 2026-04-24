@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -88,7 +88,6 @@ const fetchData = async () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans'] overflow-hidden">
-      <Toaster position="top-right" />
       
       {/* MOBILE HEADER */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-50">

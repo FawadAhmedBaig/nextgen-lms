@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import AiTutor from '../components/AiTutor';
+import { useSearchParams } from 'react-router-dom';
 
 // --- SUB-COMPONENT FOR VIDEO TO PREVENT DOM CONFLICTS ---
 const VideoPlayer = ({ videoUrl, onComplete }) => {
@@ -10,9 +11,14 @@ const VideoPlayer = ({ videoUrl, onComplete }) => {
   const playerRef = useRef(null);
 
   useEffect(() => {
-    let videoId = "";
-    if (videoUrl.includes("v=")) videoId = videoUrl.split("v=")[1].split("&")[0];
-    else if (videoUrl.includes("youtu.be/")) videoId = videoUrl.split("youtu.be/")[1].split("?")[0];
+let videoId = "";
+const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+const match = videoUrl.match(regExp);
+if (match && match[2].length === 11) {
+  videoId = match[2];
+} else {
+  videoId = videoUrl; // Fallback
+}
 
     const initPlayer = () => {
       if (playerRef.current) {
@@ -51,15 +57,18 @@ const VideoPlayer = ({ videoUrl, onComplete }) => {
 };
 
 const CourseView = () => {
-  const { id } = useParams();
+  // 1. Extract params and hooks
+  const { id } = useParams(); 
   const navigate = useNavigate();
-  const [isQuizOpen, setIsQuizOpen] = useState(false);
+
+
   const [course, setCourse] = useState(null);
   const [activeLesson, setActiveLesson] = useState(0); 
-  const [activeTab, setActiveTab] = useState('description');
+  const [activeTab, setActiveTab] = useState('description'); // Single instance
   const [loading, setLoading] = useState(true);
   const [completedLessons, setCompletedLessons] = useState([]);
   const [user, setUser] = useState(null);
+  const [isQuizOpen, setIsQuizOpen] = useState(false);
   const [quiz, setQuiz] = useState(null);
   const [quizStarted, setQuizStarted] = useState(false);
   const [selectedAnswers, setSelectedAnswers] = useState({});
@@ -68,19 +77,49 @@ const CourseView = () => {
   const [moduleQuizAnswers, setModuleQuizAnswers] = useState({});
   const [moduleQuizResult, setModuleQuizResult] = useState(null);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [searchParams] = useSearchParams();
+  const tabSectionRef = useRef(null); // Add this ref for scrolling
 
+  // Logic to handle notification redirect
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab === 'certificates') {
+      setActiveTab('certificate');
+      // Delay scroll slightly to allow the page to render
+      setTimeout(() => {
+        tabSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+    }
+  }, [searchParams]);
+  
   const getAllItems = () => {
     if (!course || !course.modules) return [];
     return course.modules.flatMap(m => m.items);
   };
 
-  const getEmbedLink = (url) => {
-    if (!url) return "";
-    if (url.includes("drive.google.com")) {
-      return url.replace(/\/view.*|\/edit.*|\/usp=sharing/g, "/preview");
-    }
-    return url;
-  };
+// --- REPLACE getEmbedLink with this ---
+const getEmbedLink = (url) => {
+  if (!url) return "";
+
+  // 1. YouTube Handling (Standardize to embed format for iframe)
+  const ytRegExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+  const ytMatch = url.match(ytRegExp);
+  if (ytMatch && ytMatch[2].length === 11) {
+    return `https://www.youtube.com/embed/${ytMatch[2]}?rel=0&modestbranding=1`;
+  }
+
+  // 2. Google Drive Links
+  if (url.includes("drive.google.com")) {
+    return url.replace(/\/view.*|\/edit.*|\/usp=sharing/g, "/preview");
+  }
+
+  // 3. standard PDFs
+  if (url.toLowerCase().endsWith('.pdf') || url.includes('.pdf?')) {
+    return `https://docs.google.com/gview?url=${encodeURIComponent(url)}&embedded=true`;
+  }
+
+  return url;
+};
 
   const toggleModule = (mIdx) => {
     setExpandedModules(prev => ({ ...prev, [mIdx]: !prev[mIdx] }));
@@ -157,24 +196,43 @@ const CourseView = () => {
     setIsQuizOpen(currentItem?.type === 'quiz' || (activeTab === 'certificate' && quizStarted));
   }, [activeLesson, activeTab, quizStarted, course]);
 
-  const moveToNext = () => {
-    const allItems = getAllItems();
-    if (activeLesson < allItems.length - 1) {
-      setActiveLesson(prev => prev + 1);
-      setModuleQuizResult(null);
-      setModuleQuizAnswers({});
-      let itemCount = 0;
-      course.modules.forEach((mod, idx) => {
-        itemCount += mod.items.length;
-        if (activeLesson + 1 < itemCount) {
-            setExpandedModules(prev => ({...prev, [idx]: true}));
-        }
-      });
-    } else {
-      setActiveTab('certificate');
-      document.getElementById('content-tabs')?.scrollIntoView({ behavior: 'smooth' });
-    }
-  };
+const moveToNext = () => {
+  const allItems = getAllItems();
+  
+  // 1. Check if there is actually a next item in the entire course
+  if (activeLesson < allItems.length - 1) {
+    const nextIndex = activeLesson + 1;
+    
+    // 2. Move the active lesson forward
+    setActiveLesson(nextIndex);
+    
+    // 3. Reset states for the new item
+    setModuleQuizResult(null);
+    setModuleQuizAnswers({});
+    
+    // 4. 🔥 SMART EXPAND: Find which module this next item belongs to and open it
+    let cumulativeCount = 0;
+    course.modules.forEach((mod, modIdx) => {
+      const moduleItemsCount = mod.items.length;
+      // If the nextIndex falls within this module's range
+      if (nextIndex >= cumulativeCount && nextIndex < cumulativeCount + moduleItemsCount) {
+        setExpandedModules(prev => ({
+          ...prev,
+          [modIdx]: true // Open the module containing the next item
+        }));
+      }
+      cumulativeCount += moduleItemsCount;
+    });
+
+} else {
+    setActiveTab('certificate');
+    toast.success("Curriculum Finished! Complete the Final Exam.", { icon: '🏁' });
+    // This ensures the user sees the exam immediately
+    setTimeout(() => {
+      tabSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 500);
+}
+};
 
   const handleAutoProgress = async () => {
     if (!completedLessons.includes(activeLesson)) {
@@ -191,44 +249,74 @@ const CourseView = () => {
     }
   };
 
-  const submitFinalQuiz = async () => {
-    if (!quiz || !quiz.questions) return;
-    let correctCount = 0;
-    quiz.questions.forEach((q, index) => { if (selectedAnswers[index] === q.correctOptionIndex) correctCount++; });
-    const score = Math.round((correctCount / quiz.questions.length) * 100);
-    const passed = score >= 80;
-    setQuizResult({ score, passed });
-    if (passed) {
-      toast.success(`Exam Passed!`);
-      await API.patch(`/users/update-progress/${id}`, { isCompleted: true });
-    } else toast.error(`Scored ${score}%. Need 80%.`);
-  };
+const submitFinalQuiz = async () => {
+  if (!quiz || !quiz.questions) return;
+  
+  const toastId = "quiz-submission"; // 🔥 Unique ID
+  
+  // Validation: Check if all questions are answered
+  if (Object.keys(selectedAnswers).length < quiz.questions.length) {
+    return toast.error("Please answer all questions before submitting.", { id: toastId });
+  }
 
-  const downloadCertificate = async () => {
-    const toastId = toast.loading("Connecting to Polygon Blockchain...");
-    try {
-      const currentUserId = user?._id || user?.id;
-      if (!currentUserId) return toast.error("Re-login required.", { id: toastId });
-      const response = await API.post('/certificate/generate', {
-        userId: currentUserId, userName: user.name, courseTitle: course.title,
-        courseId: course._id, date: new Date().toLocaleDateString()
-      }, {
-        responseType: 'blob', timeout: 120000 
-      });
-      const blob = new Blob([response.data], { type: 'application/pdf' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `Certificate_${user.name.replace(/\s+/g, '_')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      toast.success("Verified on Polygon & Downloaded! 🎓", { id: toastId });
-    } catch (error) {
-      toast.error("Verification failed. Try again.", { id: toastId });
+  let correctCount = 0;
+  quiz.questions.forEach((q, index) => { 
+    if (selectedAnswers[index] === q.correctOptionIndex) correctCount++; 
+  });
+  
+  const score = Math.round((correctCount / quiz.questions.length) * 100);
+  const passed = score >= 80;
+  
+  setQuizResult({ score, passed });
+
+  if (passed) {
+    toast.success(`Exam Passed with ${score}%!`, { id: toastId });
+    await API.patch(`/users/update-progress/${id}`, { isCompleted: true, progress: 100 });
+  } else {
+    toast.error(`Scored ${score}%. Need 80% to pass.`, { id: toastId });
+  }
+};
+
+const downloadCertificate = async () => {
+  const toastId = "cert-action"; // 🔥 Unique ID to prevent duplicates
+  
+  toast.loading("Connecting to Polygon Blockchain...", { id: toastId });
+  
+  try {
+    const currentUserId = user?._id || user?.id;
+    if (!currentUserId) {
+      return toast.error("Re-login required.", { id: toastId });
     }
-  };
+
+    const response = await API.post('/certificate/generate', {
+      userId: currentUserId, 
+      userName: user.name, 
+      courseTitle: course.title,
+      courseId: course._id, 
+      date: new Date().toLocaleDateString()
+    }, {
+      responseType: 'blob', 
+      timeout: 120000 
+    });
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `Certificate_${user.name.replace(/\s+/g, '_')}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    // 🔥 Updates the SAME toast instead of making a new one
+    toast.success("Verified on Polygon & Downloaded! 🎓", { id: toastId });
+    
+  } catch (error) {
+    console.error("Certificate Error:", error);
+    toast.error("Verification failed. Try again.", { id: toastId });
+  }
+};
 
   const allItems = getAllItems();
   const currentItem = allItems[activeLesson];
@@ -239,7 +327,6 @@ const CourseView = () => {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-white font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-900">
-      <Toaster position="top-right" />
       
       {/* MOBILE HEADER */}
       <div className="lg:hidden flex items-center justify-between p-4 border-b border-slate-100 z-50 bg-white sticky top-0">
@@ -347,48 +434,70 @@ const CourseView = () => {
         <div className="p-2 sm:p-8 max-w-5xl mx-auto w-full flex-1 flex flex-col">
           {/* RESPONSIVE CONTENT CONTAINER */}
           <div className="w-full relative bg-black rounded-2xl lg:rounded-[2.5rem] shadow-2xl overflow-hidden mb-6 sm:mb-10 border-2 sm:border-8 border-white flex flex-col min-h-[450px] lg:min-h-[550px]">
-             {currentItem?.type === 'video' ? (
-                <VideoPlayer key={currentItem.contentUrl} videoUrl={currentItem.contentUrl} onComplete={handleAutoProgress} />
-             ) : currentItem?.type === 'pdf' ? (
-                <iframe key={currentItem.contentUrl} src={getEmbedLink(currentItem.contentUrl)} className="w-full flex-1 min-h-[500px] lg:min-h-[600px] border-none bg-white" allow="autoplay" title="pdf-viewer" />
-             ) : currentItem?.type === 'quiz' ? (
-                <div className="w-full flex-1 bg-[#0F172A] p-4 sm:p-10 overflow-y-auto text-white flex flex-col text-left">
-                  <h3 className="text-lg sm:text-xl font-black mb-6 text-blue-400">Module Assessment</h3>
-                  <div className="flex-1 space-y-4 sm:space-y-8 pb-10">
-                    {currentItem.questions?.map((q, qIdx) => (
-                      <div key={qIdx} className="bg-white/5 p-4 sm:p-6 rounded-2xl border border-white/10">
-                        <p className="font-bold mb-4 text-sm sm:text-base">{qIdx + 1}. {q.questionText}</p>
-                        <div className="grid grid-cols-1 gap-3">
-                          {q.options.map((opt, oIdx) => (
-                            <button 
-                              key={oIdx} 
-                              onClick={() => setModuleQuizAnswers({...moduleQuizAnswers, [qIdx]: oIdx})}
-                              className={`p-3 sm:p-4 rounded-xl border text-xs sm:text-sm text-left transition-all font-bold cursor-pointer ${moduleQuizAnswers[qIdx] === oIdx ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white/10 border-white/10 hover:bg-white/20'}`}
-                            >
-                              {opt}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                    {/* FOOTER BUTTON FOR QUIZ - SCROLLABLE CONTENT */}
-                    <button onClick={() => {
-                      let correct = 0;
-                      currentItem.questions.forEach((q, idx) => { if(moduleQuizAnswers[idx] === q.correctOptionIndex) correct++; });
-                      const score = Math.round((correct / currentItem.questions.length) * 100);
-                      setModuleQuizResult(score);
-                      if(score >= 80) handleAutoProgress();
-                      else toast.error("80% score required to pass.");
-                    }} className="w-full bg-blue-600 py-4 rounded-2xl font-black text-sm uppercase shadow-xl hover:bg-blue-700 active:scale-95 transition-all sticky bottom-0 z-10">
-                      Submit Assessment
-                    </button>
-                  </div>
-                </div>
-             ) : null}
+{currentItem?.type === 'video' ? (
+  <iframe
+    key={currentItem.contentUrl}
+    src={getEmbedLink(currentItem.contentUrl)}
+    className="w-full flex-1 min-h-[450px] lg:min-h-[550px] border-none"
+    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+    allowFullScreen
+    title="course-video"
+  ></iframe>
+) : currentItem?.type === 'pdf' ? (
+   <iframe 
+     key={currentItem.contentUrl} // Forces iframe to refresh on lesson change
+     src={getEmbedLink(currentItem.contentUrl)} 
+     className="w-full flex-1 min-h-[500px] lg:min-h-[600px] border-none bg-white" 
+     allowFullScreen
+     title="pdf-viewer" 
+   />
+) : currentItem?.type === 'quiz' ? (
+  <div className="w-full flex-1 bg-[#0F172A] p-4 sm:p-10 overflow-y-auto text-white flex flex-col text-left">
+    <h3 className="text-lg sm:text-xl font-black mb-6 text-blue-400">Module Assessment</h3>
+    
+    {completedLessons.includes(activeLesson) ? (
+      <div className="flex-1 flex flex-col items-center justify-center text-center animate-in fade-in zoom-in duration-500">
+        <div className="w-20 h-20 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center text-4xl mb-6 border border-green-500/30">✓</div>
+        <h4 className="text-2xl font-black mb-2">Assessment Completed</h4>
+        <p className="text-slate-400 max-w-xs mx-auto mb-8">You have already passed this assessment.</p>
+        <button onClick={moveToNext} className="bg-blue-600 px-10 py-4 rounded-2xl font-black uppercase text-xs tracking-widest hover:bg-blue-700 transition-all cursor-pointer">Continue to Next Lesson</button>
+      </div>
+    ) : (
+      <div className="flex-1 space-y-4 sm:space-y-8 pb-10">
+        {currentItem.questions?.map((q, qIdx) => (
+          <div key={qIdx} className="bg-white/5 p-4 sm:p-6 rounded-2xl border border-white/10">
+            <p className="font-bold mb-4 text-sm sm:text-base">{qIdx + 1}. {q.questionText}</p>
+            <div className="grid grid-cols-1 gap-3">
+              {q.options.map((opt, oIdx) => (
+                <button 
+                  key={oIdx} 
+                  onClick={() => setModuleQuizAnswers({...moduleQuizAnswers, [qIdx]: oIdx})}
+                  className={`p-3 sm:p-4 rounded-xl border text-xs sm:text-sm text-left transition-all font-bold cursor-pointer ${moduleQuizAnswers[qIdx] === oIdx ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white/10 border-white/10 hover:bg-white/20'}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+        <button onClick={() => {
+          if (Object.keys(moduleQuizAnswers).length < currentItem.questions.length) return toast.error("Please answer all questions.");
+          let correct = 0;
+          currentItem.questions.forEach((q, idx) => { if(moduleQuizAnswers[idx] === q.correctOptionIndex) correct++; });
+          const score = Math.round((correct / currentItem.questions.length) * 100);
+          if(score >= 80) handleAutoProgress();
+          else toast.error(`Score: ${score}%. Need 80% to pass.`);
+        }} className="w-full bg-blue-600 py-4 rounded-2xl font-black text-sm uppercase shadow-xl hover:bg-blue-700 active:scale-95 transition-all sticky bottom-0 z-10">
+          Submit Assessment
+        </button>
+      </div>
+    )}
+  </div>
+) : null}
           </div>
 
           {/* TABS CONTAINER */}
-          <div id="content-tabs" className="bg-white rounded-3xl lg:rounded-[2.5rem] p-5 sm:p-8 border border-slate-100 shadow-sm mb-20 lg:mb-10">
+          <div ref={tabSectionRef} id="content-tabs" className="bg-white rounded-3xl lg:rounded-[2.5rem] p-5 sm:p-8 border border-slate-100 shadow-sm mb-20 lg:mb-10">
             <div className="flex gap-4 sm:gap-8 border-b border-slate-100 mb-8 overflow-x-auto whitespace-nowrap scrollbar-hide">
               {['description', 'instructor', 'live', 'certificate'].map((tab) => (
                 <button key={tab} onClick={() => setActiveTab(tab)} className={`pb-4 text-[10px] sm:text-xs font-black uppercase tracking-widest relative transition-all cursor-pointer ${activeTab === tab ? 'text-blue-600' : 'text-slate-400 hover:text-slate-600'}`}>
@@ -400,39 +509,64 @@ const CourseView = () => {
             
             <div className="min-h-[150px]">
               {activeTab === 'description' && <p className="text-slate-500 leading-relaxed text-sm font-medium text-left">{course.description}</p>}
-              {activeTab === 'instructor' && (
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 animate-in fade-in text-left">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-xl sm:text-2xl font-black shadow-md">
-                    {course.instructor?.name?.charAt(0)}
-                  </div>
-                  <div>
-                    <h4 className="text-base sm:text-lg font-bold text-slate-900">{course.instructor?.name}</h4>
-                    <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Lead Instructor</p>
-                  </div>
-                </div>
-              )}
-              {activeTab === 'live' && (
-                <div className="space-y-4 text-left">
-                  <h3 className="text-base sm:text-xl font-extrabold text-slate-900">Live Classes</h3>
-                  {course.liveSessions?.length > 0 ? (
-                    course.liveSessions.map((session, idx) => {
-                      const isToday = new Date().toLocaleDateString() === new Date(session.date).toLocaleDateString();
-                      return (
-                        <div key={idx} className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${isToday ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-100'}`}>
-                          <div>
-                            <p className={`text-[8px] sm:text-[10px] font-black uppercase mb-1 ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
-                              {isToday ? "🔴 Live Now" : "Scheduled"}
-                            </p>
-                            <h4 className="font-bold text-slate-900 text-sm sm:text-base">{session.title}</h4>
-                            <p className="text-[10px] sm:text-xs text-slate-500">{session.date} | {session.time}</p>
-                          </div>
-                          <a href={session.meetingLink} target="_blank" rel="noopener noreferrer" className={`w-full sm:w-auto px-6 py-3 rounded-xl font-black text-[10px] uppercase text-center transition-all ${isToday ? 'bg-blue-600 text-white shadow-lg cursor-pointer hover:bg-blue-700' : 'bg-slate-100 text-slate-400 pointer-events-none'}`}>Join Live</a>
-                        </div>
-                      );
-                    })
-                  ) : <p className="text-slate-400 text-sm py-10 text-center">No sessions scheduled.</p>}
-                </div>
-              )}
+{activeTab === 'instructor' && (
+  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 animate-in fade-in text-left">
+    <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white text-xl sm:text-2xl font-black shadow-md overflow-hidden">
+      {course.instructor?.profilePicture ? (
+        <img src={course.instructor.profilePicture} className="w-full h-full object-cover" />
+      ) : (
+        course.instructor?.name?.charAt(0)
+      )}
+    </div>
+    <div>
+      <h4 className="text-base sm:text-lg font-bold text-slate-900">{course.instructor?.name}</h4>
+      <p className="text-[10px] text-blue-600 font-black uppercase tracking-widest">Lead Instructor</p>
+    </div>
+  </div>
+)}
+{activeTab === 'live' && (
+  <div className="space-y-4 text-left">
+    <h3 className="text-base sm:text-xl font-extrabold text-slate-900">Live Classes</h3>
+    {course.liveSessions?.length > 0 ? (
+      course.liveSessions.map((session, idx) => {
+        // 🔥 Format the date for humans (e.g., April 24, 2026)
+        const dateObj = new Date(session.date);
+        const formattedDate = dateObj.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+
+        // 🔥 Compare correctly with Today's date
+        const isToday = new Date().toLocaleDateString() === dateObj.toLocaleDateString();
+        
+        return (
+          <div key={idx} className={`p-4 sm:p-6 rounded-2xl sm:rounded-[2rem] border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 transition-all ${isToday ? 'bg-blue-50 border-blue-200 shadow-sm' : 'bg-white border-slate-100'}`}>
+            <div>
+              <p className={`text-[8px] sm:text-[10px] font-black uppercase mb-1 ${isToday ? 'text-blue-600' : 'text-slate-400'}`}>
+                {isToday ? "🔴 Live Now" : "Upcoming Session"}
+              </p>
+              <h4 className="font-bold text-slate-900 text-sm sm:text-base">{session.title}</h4>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[10px] sm:text-xs font-bold text-slate-500">{formattedDate}</span>
+                <span className="text-slate-300">|</span>
+                <span className="text-[10px] sm:text-xs font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">{session.time}</span>
+              </div>
+            </div>
+            <a 
+              href={session.meetingLink} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className={`w-full sm:w-auto px-6 py-3 rounded-xl font-black text-[10px] uppercase text-center transition-all ${isToday ? 'bg-blue-600 text-white shadow-lg cursor-pointer hover:bg-blue-700' : 'bg-slate-100 text-slate-400 pointer-events-none'}`}
+            >
+              {isToday ? "Join Live Now" : "Waiting for Host"}
+            </a>
+          </div>
+        );
+      })
+    ) : <p className="text-slate-400 text-sm py-10 text-center">No sessions scheduled.</p>}
+  </div>
+)}
               {activeTab === 'certificate' && (
                 <div className="text-center py-6">
                   {!isCourseComplete ? (

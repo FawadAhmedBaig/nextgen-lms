@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ethers } from 'ethers';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import abiData from '../constants/contractABI.json';
 
 const Verify = () => {
@@ -68,7 +68,6 @@ try {
 
   return (
     <div className="min-h-screen bg-slate-50 pt-8 md:pt-12 pb-12 md:pb-20 font-['Plus_Jakarta_Sans'] text-left overflow-x-hidden">
-      <Toaster position="top-center" />
       <div className="max-w-4xl mx-auto px-4 md:px-8">
         
         <div className="text-center mb-10 md:mb-16">

@@ -37,35 +37,42 @@ const seedData = async () => {
     const salt = await bcrypt.genSalt(10);
     const hashedPass = await bcrypt.hash("password123", salt);
     
-    // 2. Create Users
+// 2. Create Users
     const testStudent = await User.create({
-      name: "Fawad Ahmed", email: "student@test.com", password_hash: hashedPass,
+      name: "Fawad Ahmed", email: "fawad@test.com", password_hash: hashedPass,
       role: 'student', status: 'active', studentId: "STU-F-12345", bio: "Final year BS CS Student"
     });
-
+    
     const testAdmin = await User.create({
       name: "System Admin", email: "admin@test.com", password_hash: hashedPass,
       role: 'admin', status: 'active', studentId: "ADM-G-99999", bio: "Platform Administrator"
     });
 
+    // Existing Instructor
     const approvedInstructor = await User.create({
       name: "Dr. Saleem Ullah", email: "saleem@test.com", password_hash: hashedPass,
       role: 'instructor', status: 'active', studentId: "INST-S-001", bio: "Head of CS Department"
     });
 
-    console.log("✅ Users Created.");
+    // 🔥 NEW: 2nd Instructor
+    const secondInstructor = await User.create({
+      name: "Dr. Shahzad Hussain", email: "shahzad@test.com", password_hash: hashedPass,
+      role: 'instructor', status: 'active', studentId: "INST-S-002", bio: "Professor of Data Science & Web Engineering"
+    });
+
+    console.log("✅ Users Created (2 Instructors).");
 
     // Helper to generate 3 Modules per course
     const createModules = (topic, vidIds) => [
       {
-        name: `Module 1: Introduction to ${topic}`,
+        name: `Introduction to ${topic}`,
         items: [
           { type: 'video', title: `${topic} Fundamentals`, contentUrl: `https://www.youtube.com/watch?v=${vidIds[0]}` },
           { type: 'pdf', title: `${topic} Study Guide`, contentUrl: "https://bitcoin.org/bitcoin.pdf" }
         ]
       },
       {
-        name: `Module 2: Advanced ${topic}`,
+        name: `Advanced ${topic}`,
         items: [
           { type: 'video', title: `Mastering ${topic}`, contentUrl: `https://www.youtube.com/watch?v=${vidIds[1]}` },
           { type: 'quiz', title: `${topic} Skills Check`, questions: [
@@ -76,7 +83,7 @@ const seedData = async () => {
         ]
       },
       {
-        name: `Module 3: Project Implementation`,
+        name: `Project Implementation`,
         items: [
           { type: 'video', title: `${topic} Real-world Demo`, contentUrl: `https://www.youtube.com/watch?v=${vidIds[2]}` }
         ]
@@ -95,70 +102,70 @@ const seedData = async () => {
         title: "Ethereum Smart Contract Dev", 
         cat: "Blockchain", 
         img: "https://images.pexels.com/photos/730547/pexels-photo-730547.jpeg", 
-        vids: ["M576WGiDBdQ", "coQ5dg8wM2o", "ipwxYa-s1ss"], 
+        vids: ["M576WGiDBdQ", "coQ5dg8wM2o", "YBJ-kbU0-eA"], 
         desc: "Master the Solidity programming language for the Ethereum Virtual Machine (EVM). This course covers smart contract security, ERC-20 and ERC-721 token standards, and deploying immutable code to the mainnet using Hardhat and Truffle." 
       },
       { 
         title: "DeFi Protocols & Yield Farming", 
         cat: "Blockchain", 
         img: "https://images.pexels.com/photos/6770610/pexels-photo-6770610.jpeg", 
-        vids: ["k9WdXyS4930", "17O5P724pGg", "aXjL_F9u-E0"], 
+        vids: ["J0z5WaiHhQk&t=287s", "qlXpThXXQUw", "aSJJ5nE_WH8"], 
         desc: "Explore the mathematics of Decentralized Finance. Study Automated Market Makers (AMM) like Uniswap, lending protocols like Aave, and yield optimization strategies. Understand liquidity pools, slippage, and impermanent loss in the Web3 ecosystem." 
       },
       { 
         title: "Hyperledger for Enterprise", 
         cat: "Blockchain", 
         img: "https://images.pexels.com/photos/373543/pexels-photo-373543.jpeg", 
-        vids: ["JSw_Bjt_Xdw", "v99Z6f_r5M8", "UnmD-7t_Vlo"], 
+        vids: ["wBWiqssisuQ", "Qok1nxp3ps0", "LaxU-dmciWY"], 
         desc: "Learn to build permissioned blockchain networks for corporate environments using Hyperledger Fabric. Focus on private channels, chaincode development in Go/Node.js, and integrating blockchain with enterprise supply chain management systems." 
       },
       { 
         title: "AI Essentials", 
         cat: "Artificial Intelligence", 
         img: "https://images.pexels.com/photos/6153354/pexels-photo-6153354.jpeg", 
-        vids: ["2ePf9rue1Ao", "ad79nYk2keg", "JMUxmLgwRY8"], 
+        vids: ["2ePf9rue1Ao", "ad79nYk2keg", "Hz0GtSycbLE"], 
         desc: "Understand the mathematical foundations of Artificial Intelligence. Covers supervised and unsupervised learning, gradient descent optimization, and basic neural network structures. Transition from classical algorithms to modern deep learning." 
       },
       { 
         title: "Computer Vision with CNNs", 
         cat: "Artificial Intelligence", 
         img: "https://images.pexels.com/photos/2599244/pexels-photo-2599244.jpeg", 
-        vids: ["YRhxdVk_n6g", "u7TOnX_DShU", "vIci3C4JkL0"], 
+        vids: ["QzY57FaENXg", "zfiSAzpy9NM", "kSqxn6zGE0c"], 
         desc: "Teach machines to interpret visual data. Learn Convolutional Neural Networks (CNN) for image classification, object detection, and segmentation using TensorFlow and Keras. Includes real-time processing with OpenCV and YOLO architectures." 
       },
       { 
         title: "Generative AI & LLMs", 
         cat: "Artificial Intelligence", 
         img: "https://images.pexels.com/photos/8386440/pexels-photo-8386440.jpeg", 
-        vids: ["hfIUstzHs9A", "5slyuBZ7U8c", "wjZofJX0v4M"], 
+        vids: ["hfIUstzHs9A", "yHk7Vavmc7Q", "wjZofJX0v4M"], 
         desc: "Unlock the power of Transformer architectures and Large Language Models (LLMs). Master prompt engineering, fine-tuning pre-trained models like GPT-4, and implementing Retrieval-Augmented Generation (RAG) for customized AI agents." 
       },
       { 
         title: "AI Ethics & Governance", 
         cat: "Artificial Intelligence", 
         img: "https://images.pexels.com/photos/5473955/pexels-photo-5473955.jpeg", 
-        vids: ["gh5_S5K4_tU", "XvOOn1H3o9I", "u2V0B7xY_m4"], 
+        vids: ["aGwYtUzMQUk", "KiT0T12Yyno", "vNzI7CP31d0"], 
         desc: "Navigate the socio-technical landscape of AI. Study algorithmic bias, data privacy regulations like GDPR, and safety alignment. Learn to build responsible AI systems that are transparent, fair, and explainable." 
       },
       { 
         title: "Full-Stack MERN Mastery", 
         cat: "Web Development", 
         img: "https://images.pexels.com/photos/1181263/pexels-photo-1181263.jpeg", 
-        vids: ["7CqJlxBYj-M", "P4S7NoK-O-A", "vjf774RKrLc"], 
+        vids: ["7CqJlxBYj-M", "O3BUHwfHf84", "vjf774RKrLc"], 
         desc: "Comprehensive web development using the MERN stack: MongoDB, Express.js, React, and Node.js. Build responsive frontend interfaces, RESTful APIs, and manage state with Redux. Focus on JavaScript, JSX, and full-stack deployment." 
       },
       { 
         title: "Next.js 14 Performance", 
         cat: "Web Development", 
         img: "https://images.pexels.com/photos/1181675/pexels-photo-1181675.jpeg", 
-        vids: ["Sklc_f95_9k", "wm5gMKuwSYk", "ZVnjOPwW4Vg"], 
+        vids: ["xnOwOBYaA3w", "wm5gMKuwSYk", "NZU8U_5HOlQ"], 
         desc: "Advanced React optimization with Next.js. Master Server Components, App Router logic, Server-Side Rendering (SSR), and Incremental Static Regeneration (ISR). Build lightning-fast web applications with high SEO performance." 
       },
       { 
         title: "UI/UX Design for Devs", 
         cat: "Web Development", 
         img: "https://images.pexels.com/photos/196644/pexels-photo-196644.jpeg", 
-        vids: ["c9Wg6A_zEAY", "36_8X_rS-2I", "6f5gT58O-W0"], 
+        vids: ["08MrVhy2qk8", "truRwcI7-kg", "j0cR1Sf0I24"], 
         desc: "Bridge the gap between design and code. Learn Figma prototyping, typography, color theory, and accessibility (WCAG) standards. Translate high-fidelity designs into pixel-perfect CSS and modular React components." 
       },
       { 
@@ -172,74 +179,91 @@ const seedData = async () => {
         title: "Data Science with Python", 
         cat: "Data Science", 
         img: "https://images.pexels.com/photos/590022/pexels-photo-590022.jpeg", 
-        vids: ["LHBE6Q9XlzI", "6W0X8W7_Fhc", "W8268_H-P_Y"], 
+        vids: ["LHBE6Q9XlzI", "PgK5qx44n0Y", "HrRA67O-QXI"], 
         desc: "Data analysis and statistical modeling using Python. Master library ecosystems including Pandas for dataframes, NumPy for numerical computation, and Matplotlib/Seaborn for advanced data visualization and storytelling." 
       },
       { 
         title: "SQL for Data Analytics", 
         cat: "Data Science", 
         img: "https://images.pexels.com/photos/265087/pexels-photo-265087.jpeg", 
-        vids: ["7S_tz1z_5bA", "HXV3zeQKqGY", "27agsguJm_U"], 
+        vids: ["7S_tz1z_5bA", "HXV3zeQKqGY", "5PrZvPeUw60"], 
         desc: "The core language of data. Learn complex SQL queries, window functions, and database design. Perform ETL processes and aggregate massive datasets from relational databases like PostgreSQL and MySQL." 
       },
       { 
         title: "Big Data with Spark", 
         cat: "Data Science", 
         img: "https://images.pexels.com/photos/669615/pexels-photo-669615.jpeg", 
-        vids: ["_C8kWso4ne4", "pW3Y68u4B-8", "Yv64pPj9568"], 
+        vids: ["_C8kWso4ne4", "rC3JerEWSW0", "BlWS4foN9cY"], 
         desc: "Harness the power of distributed computing. Learn Apache Spark and PySpark to process petabytes of data across clusters. Focus on Spark SQL, RDDs, and real-time streaming data analysis for big data pipelines." 
       },
       { 
         title: "Data Visualization: Tableau", 
         cat: "Data Science", 
         img: "https://images.pexels.com/photos/1036936/pexels-photo-1036936.jpeg", 
-        vids: ["7Jl-R_fclQ8", "fO-3p80EIdk", "fGk_39rK_y0"], 
+        vids: ["tNLp_JVipoQ", "j8FSP8XuFyk", "dahrmqT5GD4"], 
         desc: "Transform raw data into business intelligence. Master Tableau for creating interactive dashboards, calculated fields, and advanced data mapping. Learn to communicate complex insights to stakeholders through visual dashboards." 
       },
       { 
         title: "Ethical Hacking: Zero to Hero", 
         cat: "Cybersecurity", 
         img: "https://images.pexels.com/photos/5380664/pexels-photo-5380664.jpeg", 
-        vids: ["3Kq1MIfTWCE", "dz7Ntp7KQ8c", "dz7Ntp7KQ8c"], 
+        vids: ["3Kq1MIfTWCE", "2eLJNBroFrg", "ug8W0sFiVJo"], 
         desc: "Master the mindset of an attacker to build better defenses. Learn penetration testing, vulnerability assessment, and exploit development using Kali Linux, Metasploit, and Nmap. Includes web application and network hacking." 
       },
       { 
         title: "Network Security & Firewalls", 
         cat: "Cybersecurity", 
         img: "https://images.pexels.com/photos/60504/security-protection-anti-virus-software-60504.jpeg", 
-        vids: ["vIci3C4JkL0", "6f5gT58O-W0", "Wf2eSG3owoA"], 
+        vids: ["GM0X-GjV5Ik", "WO7wP3QaJ_g", "o_vyfo3Hw0Y"], 
         desc: "Secure corporate infrastructure against intrusion. Learn to configure enterprise firewalls (Cisco/Palo Alto), manage Intrusion Detection Systems (IDS), and implement Zero Trust Network Access (ZTNA) protocols." 
       },
       { 
         title: "Cloud Security (AWS/Azure)", 
         cat: "Cybersecurity", 
         img: "https://images.pexels.com/photos/4439425/pexels-photo-4439425.jpeg", 
-        vids: ["4t48p_Fm_58", "6W0X8W7_Fhc", "hP77Rua1E0c"], 
+        vids: ["Qt9lhzFhW_c", "amCrXVFX1C4", "8-1KMWfEPuE"], 
         desc: "Defending cloud-native environments. Study AWS IAM policies, Azure Sentinel, and cloud encryption standards. Master the Shared Responsibility Model and protect containerized applications from cloud-specific threats." 
       },
       { 
         title: "Digital Forensics", 
         cat: "Cybersecurity", 
         img: "https://images.pexels.com/photos/3861964/pexels-photo-3861964.jpeg", 
-        vids: ["Z_vL97q-O28", "u2V0B7xY_m4", "pTFZFxd4hOI"], 
+        vids: ["8zxrd6O9QC0", "JNIUeGMax-U", "vD7uJ8aP0zA"], 
         desc: "Investigate cybercrime through digital footprints. Learn to collect court-admissible evidence, perform disk imaging, and analyze memory dumps. Focus on post-breach analysis and incident response procedures." 
       }
     ];
 
-    for (const c of courseDefinitions) {
-      const course = await Course.create({
-        title: c.title,
-        description: c.desc,
-        category: c.cat,
-        imageUrl: c.img,
-        price: (c.title.includes("Essentials") || c.title.includes("MERN")) ? "Free" : "$49.00",
-        duration: "15h",
-        level: "Beginner",
-        instructor: { _id: approvedInstructor._id, name: approvedInstructor.name },
-        modules: createModules(c.title, c.vids),
-        isAIIndexed: false,
-        enrolledCount: Math.floor(Math.random() * 90) + 10 
-      });
+    // --- RANDOMIZATION HELPERS ---
+    const prices = ["Free", "$29.00", "$49.00", "$79.00", "$99.00", "Free", "$55.00"];
+    const levels = ["Beginner", "Intermediate", "Advanced"];
+    const durations = ["8h", "12h", "15h", "20h", "25h", "30h"];
+
+    const getRandom = (arr) => arr[Math.floor(Math.random() * arr.length)];
+
+  for (const c of courseDefinitions) {
+        // 🔥 Logic to assign instructor based on category
+        let assignedInstructorId;
+        if (c.cat === "Web Development" || c.cat === "Data Science") {
+          assignedInstructorId = secondInstructor._id; // Dr. Shahzad Hussain
+        } else {
+          assignedInstructorId = approvedInstructor._id; // Dr. Saleem Ullah (AI, Blockchain, CyberSecurity)
+        }
+
+        const course = await Course.create({
+          title: c.title,
+          description: c.desc,
+          category: c.cat,
+          imageUrl: c.img,
+          price: getRandom(prices),
+          duration: getRandom(durations),
+          level: getRandom(levels),
+          
+          instructor: assignedInstructorId, // 🎯 Use the assigned ID here
+          
+          modules: createModules(c.title, c.vids),
+          isAIIndexed: false,
+          enrolledCount: Math.floor(Math.random() * 90) + 10 
+        });
 
       // 🔥 AI PIPELINE WITH SMART RETRY ON 429 ERROR
       let indexed = false;
@@ -292,9 +316,9 @@ const seedData = async () => {
     const ethCourse = await Course.findOne({ title: "Ethereum Smart Contract Dev" });
     const aiCourse = await Course.findOne({ title: "Generative AI & LLMs" });
 
-    await Course.findByIdAndUpdate(mernCourse._id, { $set: { enrolledCount: 1500 } });
-    await Course.findByIdAndUpdate(ethCourse._id, { $set: { enrolledCount: 1200 } });
-    await Course.findByIdAndUpdate(aiCourse._id, { $set: { enrolledCount: 1100 } });
+    await Course.findByIdAndUpdate(mernCourse._id, { $set: { enrolledCount: 300 } });
+    await Course.findByIdAndUpdate(ethCourse._id, { $set: { enrolledCount: 400 } });
+    await Course.findByIdAndUpdate(aiCourse._id, { $set: { enrolledCount: 500 } });
     
     await Enrollment.create([
       { student: testStudent._id, course: mernCourse._id, progress: 100, completedLessons: [0, 1, 2, 3, 4], isCompleted: true },

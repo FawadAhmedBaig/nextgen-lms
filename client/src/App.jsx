@@ -1,104 +1,130 @@
-import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import React, { useEffect, lazy, Suspense } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
+
+// --- SHARED COMPONENTS (KEEP STANDARD IMPORT) ---
 import Layout from './components/Layout'; 
-import LandingPage from './pages/LandingPage';
-import Signup from './pages/Signup';
-import Login from './pages/Login';
-import Courses from './pages/Courses';
-import CourseView from './pages/CourseView';
-import Profile from './pages/Profile';
-import Verify from './pages/Verify';
-import OrderComplete from './pages/OrderComplete';
-import Checkout from './pages/Checkout';
-import InstructorDashboard from './pages/InstructorDashboard';
-import ForgotPassword from './pages/forgotPassword';
-import ResetPassword from './pages/resetPassword';
 import ProtectedRoute from './components/ProtectedRoute';
-import EditCourse from './pages/EditCourse';
-import CourseManagement from './pages/CourseManagement';
-import MyCourses from './pages/MyCourses';
-import AdminDashboard from './pages/AdminDashboard';
-import CourseDetail from './pages/CourseDetail';
+
+// --- LAZY LOADED PAGES (OPTIMIZATION) ---
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const Signup = lazy(() => import('./pages/Signup'));
+const Login = lazy(() => import('./pages/Login'));
+const Courses = lazy(() => import('./pages/Courses'));
+const CourseView = lazy(() => import('./pages/CourseView'));
+const Profile = lazy(() => import('./pages/Profile'));
+const Verify = lazy(() => import('./pages/Verify'));
+const OrderComplete = lazy(() => import('./pages/OrderComplete'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const InstructorDashboard = lazy(() => import('./pages/InstructorDashboard'));
+const ForgotPassword = lazy(() => import('./pages/forgotPassword'));
+const ResetPassword = lazy(() => import('./pages/resetPassword'));
+const EditCourse = lazy(() => import('./pages/EditCourse'));
+const CourseManagement = lazy(() => import('./pages/CourseManagement'));
+const MyCourses = lazy(() => import('./pages/MyCourses'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const CourseDetail = lazy(() => import('./pages/CourseDetail'));
+
+// --- HELPER COMPONENT: CLEARS TOASTS ON NAVIGATION ---
+const ToastCleanup = () => {
+  const location = useLocation();
+  useEffect(() => {
+    toast.dismiss();
+  }, [location.pathname]);
+  return null;
+};
+
+// --- LOADING FALLBACK COMPONENT ---
+const PageLoader = () => (
+  <div className="h-screen w-full flex flex-col items-center justify-center bg-white">
+    <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-4"></div>
+    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 animate-pulse">Initializing Workspace...</p>
+  </div>
+);
 
 function App() {
   return (
     <Router>
-      <Routes>
-        {/* Everything inside this Route will use the Layout (Navbar + pt-20) */}
-        <Route element={<Layout />}>
-          
-          {/* --- PUBLIC ROUTES --- */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password/:token" element={<ResetPassword />} />
-          <Route path="/verify" element={<Verify />} />
-          <Route path="/course/:id" element={<CourseDetail />} />
+      <ToastCleanup />
+      
+      {/* 🔥 Suspense boundary catches lazy-loaded chunks and shows the loader */}
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          <Route element={<Layout />}>
+            
+            {/* --- PUBLIC ROUTES --- */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/signup" element={<Signup />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
+            <Route path="/verify" element={<Verify />} />
+            <Route path="/course/:id" element={<CourseDetail />} />
 
-          {/* --- STUDENT ONLY ROUTES --- */}
-          <Route path="/courses" element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <Courses />
-            </ProtectedRoute>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <Checkout />
-            </ProtectedRoute>
-          } />
-          <Route path="/my-courses" element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <MyCourses />
-            </ProtectedRoute>
-          } />
-          <Route path="/order-complete" element={
-            <ProtectedRoute allowedRoles={['student']}>
-              <OrderComplete />
-            </ProtectedRoute>
-          } />
+            {/* --- STUDENT ONLY ROUTES --- */}
+            <Route path="/courses" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <Courses />
+              </ProtectedRoute>
+            } />
+            <Route path="/checkout" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <Checkout />
+              </ProtectedRoute>
+            } />
+            <Route path="/my-courses" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <MyCourses />
+              </ProtectedRoute>
+            } />
+            <Route path="/order-complete" element={
+              <ProtectedRoute allowedRoles={['student']}>
+                <OrderComplete />
+              </ProtectedRoute>
+            } />
 
-          {/* --- SHARED ROUTES (STUDENT & INSTRUCTOR) --- */}
-          <Route path="/profile" element={
-            <ProtectedRoute allowedRoles={['student', 'instructor']}>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/course-view/:id" element={
-            <ProtectedRoute allowedRoles={['student', 'instructor', 'admin']}>
-              <CourseView />
-            </ProtectedRoute>
-          } />
+            {/* --- SHARED ROUTES (STUDENT & INSTRUCTOR) --- */}
+            <Route path="/profile" element={
+              <ProtectedRoute allowedRoles={['student', 'instructor']}>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/course-view/:id" element={
+              <ProtectedRoute allowedRoles={['student', 'instructor', 'admin']}>
+                <CourseView />
+              </ProtectedRoute>
+            } />
 
-          {/* --- INSTRUCTOR ONLY ROUTES --- */}
-          <Route path="/instructor-dashboard" element={
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <InstructorDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/course-management" element={
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <CourseManagement />
-            </ProtectedRoute>
-          } />
-          <Route path="/edit-course/:id" element={
-            <ProtectedRoute allowedRoles={['instructor']}>
-              <EditCourse />
-            </ProtectedRoute>
-          } />
+            {/* --- INSTRUCTOR ONLY ROUTES --- */}
+            <Route path="/instructor-dashboard" element={
+              <ProtectedRoute allowedRoles={['instructor']}>
+                <InstructorDashboard />
+              </ProtectedRoute>
+            } />
+            <Route path="/course-management" element={
+              <ProtectedRoute allowedRoles={['instructor']}>
+                <CourseManagement />
+              </ProtectedRoute>
+            } />
+            <Route path="/edit-course/:id" element={
+              <ProtectedRoute allowedRoles={['instructor']}>
+                <EditCourse />
+              </ProtectedRoute>
+            } />
 
-          {/* --- ADMIN ONLY ROUTE --- */}
-          <Route path="/admin" element={
-            <ProtectedRoute allowedRoles={['admin']}>
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
+            {/* --- ADMIN ONLY ROUTE --- */}
+            <Route path="/admin" element={
+              <ProtectedRoute allowedRoles={['admin']}>
+                <AdminDashboard />
+              </ProtectedRoute>
+            } />
 
-          {/* FALLBACK: Redirect any unknown routes to home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+            {/* FALLBACK */}
+            <Route path="*" element={<Navigate to="/" replace />} />
 
-        </Route>
-      </Routes>
+          </Route>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

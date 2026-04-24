@@ -48,17 +48,11 @@ const courseSchema = new mongoose.Schema({
   duration: { type: String, required: true },
   level: { type: String, required: true },
 
-  instructor: {
-    _id: { 
-      type: mongoose.Schema.Types.ObjectId, 
-      ref: 'User', 
-      required: true 
-    },
-    name: { 
-      type: String, 
-      required: true 
-    }
-  },
+instructor: {
+  type: mongoose.Schema.Types.ObjectId,
+  ref: 'User',
+  required: true
+},
 
   modules: [moduleSchema], 
   pdfUrl: { type: String },

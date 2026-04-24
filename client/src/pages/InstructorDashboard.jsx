@@ -1,19 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
+import { useLocation } from 'react-router-dom';
 
 const InstructorDashboard = () => {
   const navigate = useNavigate();
   const pdfInputRef = useRef(null);
   const imageInputRef = useRef(null);
-  
-  const [activeTab, setActiveTab] = useState('overview');
   const [courseViewMode, setCourseViewMode] = useState('list'); 
   const [isPublishing, setIsPublishing] = useState(false);
   const [myCourses, setMyCourses] = useState([]);
   const [editingCourseId, setEditingCourseId] = useState(null);
-  
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState('overview');
   // Real-time Data States
   const [stats, setStats] = useState([
     { label: "Total Students", value: "0", icon: "👥", key: 'totalStudents' },
@@ -35,17 +35,38 @@ const InstructorDashboard = () => {
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('token');
 
+useEffect(() => {
+    // 1. Force Scroll to Top on every mount/redirect
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // 2. Handle Redirects from Profile
+    if (location.state?.activeTab) {
+      const target = location.state.activeTab;
+      
+      if (target === 'manage') {
+        setActiveTab('courses');
+        setCourseViewMode('list');
+      } else if (target === 'create') {
+        setActiveTab('courses');
+        setCourseViewMode('create');
+      } else {
+        setActiveTab(target);
+      }
+    } else {
+      // 3. Default to Overview if no state is passed
+      setActiveTab('overview');
+      setCourseViewMode('list');
+    }
+  }, [location.state]);
   // --- REAL-TIME DATA FETCHING ---
 const fetchDashboardData = async () => {
     if (!token || !user) return;
     setLoadingStats(true);
     
-    // Get the unique ID
-    const instructorId = user.id || user._id;
-
-try {
-      // 1. Fetch Instructor Stats
-      const statsRes = await API.get(`/instructor/stats?instructorId=${instructorId}`);
+    try {
+      // 1. Fetch Instructor Stats 
+      // 🔥 FIX: We remove the manual query string and let the auth token handle identity
+      const statsRes = await API.get(`/instructor/stats`);
       
       const data = statsRes.data;
       const updatedStats = stats.map(s => ({
@@ -55,11 +76,13 @@ try {
       setStats(updatedStats);
 
       // 2. Fetch Student Progress
-      const progressRes = await API.get(`/instructor/student-progress?instructorId=${instructorId}`);
+      // 🔥 FIX: Same here, use the protected route
+      const progressRes = await API.get(`/instructor/student-progress`);
       setStudentProgress(progressRes.data);
     } catch (err) {
       console.error("Dashboard sync error", err);
-    }finally {
+      // Optional: toast.error("Stats sync failed");
+    } finally {
       setLoadingStats(false);
     }
   };
@@ -75,7 +98,8 @@ try {
   }, [activeTab]);
 
 const fetchMyCourses = async () => {
-try {
+  try {
+    // We add a timestamp to prevent browser caching
     const res = await API.get(`/courses/all?t=${Date.now()}`);
     
     const currentUserId = user?.id || user?._id;
@@ -91,7 +115,13 @@ try {
       return isIdMatch || isNameMatch;
     });
 
-    setMyCourses(filtered.reverse());
+    // 🔥 THE FIX: Sort by updatedAt (Newest first)
+    // This ensures that either a NEWLY created course or a RECENTLY edited course jumps to the top.
+    const sorted = filtered.sort((a, b) => {
+      return new Date(b.updatedAt) - new Date(a.updatedAt);
+    });
+
+    setMyCourses(sorted);
   } catch (err) {
     console.error("Fetch courses error:", err);
     toast.error("Failed to load your courses");
@@ -120,24 +150,51 @@ try {
     questions: [{ questionText: '', options: ['', '', '', ''], correctOptionIndex: 0 }]
   });
 
-  const formatPriceInput = (val) => {
-    const v = val.toString().toLowerCase().trim();
-    if (v === '0' || v === 'free' || v === '') return 'Free';
-    const numeric = v.replace(/[^\d.]/g, '');
-    return numeric ? `$${parseFloat(numeric).toFixed(2)}` : 'Free';
-  };
+// --- IMPROVED UTILITY FUNCTIONS ---
 
-  const formatDurationInput = (val) => {
-    let v = val.toLowerCase().replace(/\s+/g, '');
-    if (!v) return '';
-    if (/^\d+$/.test(v)) return `${v}h`;
-    const hourMatch = v.match(/(\d+)h/);
-    const minMatch = v.match(/(\d+)m/);
-    let result = "";
-    if (hourMatch) result += `${hourMatch[1]}h`;
-    if (minMatch) result += ` ${minMatch[1]}min`;
-    return result.trim() || val;
-  };
+const formatPriceInput = (val) => {
+  let v = val.toString().trim();
+  if (v === '' || v.toLowerCase() === 'free' || v === '0') return 'Free';
+  
+  // Remove everything except numbers and a single decimal point
+  let numeric = v.replace(/[^0-9.]/g, '');
+  
+  // Ensure it starts with $
+  return numeric ? `$${numeric}` : 'Free';
+};
+
+const formatDurationInput = (val) => {
+  let v = val.toLowerCase().trim();
+  if (!v) return '';
+
+  // Extract all numbers and units
+  const hoursMatch = v.match(/(\d+)\s*(h|hour|hr|hrs)/);
+  const minsMatch = v.match(/(\d+)\s*(m|min|minute|mins)/);
+
+  // If user typed only a number (e.g., "10"), assume hours
+  if (/^\d+$/.test(v)) return `${v}h`;
+
+  let result = "";
+  if (hoursMatch) result += `${hoursMatch[1]}h `;
+  if (minsMatch) result += `${minsMatch[1]}min`;
+
+  // 🔥 THE FIX: If no valid time pattern was found, return empty string 
+  // instead of the original 'fgh'
+  return result.trim() || ""; 
+};
+
+const isValidUrl = (url) => {
+  try {
+    const parsed = new URL(url);
+    return ['http:', 'https:'].includes(parsed.protocol);
+  } catch (e) {
+    return false;
+  }
+};
+
+const isYouTubeLink = (url) => {
+  return isValidUrl(url) && (url.includes('youtube.com') || url.includes('youtu.be'));
+};
 
   const addModule = () => {
     setCourseData({ ...courseData, modules: [...courseData.modules, { name: '', items: [] }] });
@@ -186,14 +243,32 @@ try {
     } catch (e) { console.log("No live sessions found."); }
   };
 
-  const resetForm = () => {
-    setCourseData({
-      title: '', price: '', description: '', category: 'Blockchain',
-      duration: '', level: 'Beginner', instructorName: user.name,
-      modules: [{ name: 'Introduction', items: [{ type: 'video', title: '', contentUrl: '' }] }]
-    });
-    setPdfFile(null); setImageFile(null); setEditingCourseId(null); setCourseViewMode('list');
-  };
+const resetForm = () => {
+  // 1. Reset Course Metadata
+  setCourseData({
+    title: '', price: '', description: '', category: 'Blockchain',
+    duration: '', level: 'Beginner', instructorName: user?.name || '',
+    modules: [{ name: 'Introduction', items: [{ type: 'video', title: '', contentUrl: '' }] }]
+  });
+
+  // 2. 🔥 Clear the Final Quiz
+  setQuizData({
+    title: 'Final Graded Quiz',
+    passingScore: 80,
+    questions: [{ questionText: '', options: ['', '', '', ''], correctOptionIndex: 0 }]
+  });
+
+  // 3. 🔥 Clear Live Session Form & List
+  setNewLiveSession({ title: '', date: '', time: '', meetingLink: '' });
+  setExistingLiveSessions([]);
+  setEditingSessionId(null);
+
+  // 4. Clear Files and Modes
+  setPdfFile(null); 
+  setImageFile(null); 
+  setEditingCourseId(null); 
+  setCourseViewMode('list');
+};
 
   const handleFileUpload = (e, type) => {
     const file = e.target.files[0];
@@ -214,56 +289,145 @@ try {
     setQuizData({ ...quizData, questions: updatedQuestions });
   };
 
-  const handlePublishCourse = async () => {
-    if (isPublishing) return;
-    if (courseViewMode === 'create' && (!pdfFile || !imageFile)) {
-      return toast.error("Thumbnail and PDF are required for new courses.");
-    }
-    setIsPublishing(true);
-    const loadingToast = toast.loading(courseViewMode === 'edit' ? "Updating..." : "Publishing...");
-    try {
-      const data = new FormData();
-      data.append('title', courseData.title || "");
-      data.append('description', courseData.description || "");
-      data.append('price', formatPriceInput(courseData.price));
-      data.append('category', courseData.category || "Blockchain");
-      data.append('duration', formatDurationInput(courseData.duration));
-      data.append('level', courseData.level || "Beginner");
-      data.append('instructorId', user.id || user._id);
-      data.append('instructorName', user.name);
-      data.append('modules', JSON.stringify(courseData.modules || []));
-      if (pdfFile) data.append('pdf', pdfFile);
-      if (imageFile) data.append('image', imageFile);
-      
-      let courseId = editingCourseId;
-      if (courseViewMode === 'edit') {
-        await API.put(`/courses/${editingCourseId}`, data, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-      } else {
-        const res = await API.post('/courses/create', data, {
-          headers: { 'Content-Type': 'multipart/form-data' }
-        });
-        courseId = res.data._id;
-      }
-      
-      if (quizData && quizData.questions) {
-          await API.post('/quizzes/create', {
-            course: courseId, title: quizData.title || "Final Quiz",
-            questions: quizData.questions, passingScore: quizData.passingScore || 80
-          });
-      }
-      toast.success("Successfully updated!", { id: loadingToast });
-      resetForm();
-      await fetchMyCourses(); 
-    } catch (err) {
-      toast.error("Save failed.", { id: loadingToast });
-    } finally {
-      setIsPublishing(false);
-    }
-  };
+const handlePublishCourse = async () => {
+  if (isPublishing) return;
 
+  // --- 1. HELPER: URL & PATTERN VALIDATORS ---
+  const urlPattern = /^(https?:\/\/)[^\s/$.?#].[^\s]*$/i;
+  const ytPattern = /^(https?:\/\/)?(www\.)?(youtube\.com|youtu\.be)\/(watch\?v=|embed\/|shorts\/)?([a-zA-Z0-9_-]{11})(\S+)?$/;
+
+  // --- 2. PRE-PROCESS & SANITIZE INPUTS ---
+  const sanitizedDuration = formatDurationInput(courseData.duration);
+  const sanitizedPrice = formatPriceInput(courseData.price);
+
+  // --- 3. THE VALIDATION CHECKLIST ---
+  const errors = [];
+
+  // Basic Info Checks
+  if (!courseData.title.trim() || courseData.title.length < 5) errors.push("Title (min 5 chars)");
+  if (!courseData.description.trim() || courseData.description.length < 20) errors.push("Description (min 20 chars)");
+  if (!sanitizedDuration) errors.push("Duration (Format: '10h', '30min', or '1h 30min')");
+  
+  // Asset & Quiz Checks (Only Required for New Courses)
+  if (courseViewMode === 'create') {
+    if (!imageFile) errors.push("Course Thumbnail Image");
+    if (!pdfFile) errors.push("Course Syllabus PDF");
+    
+    // 🔥 FINAL GRADED QUIZ VALIDATION
+    const hasQuizText = quizData?.questions?.[0]?.questionText?.trim();
+    if (!hasQuizText) {
+      errors.push("Final Graded Quiz: At least 1 question is required before publishing");
+    }
+  }
+
+  // Deep Module & Item Content Checks
+  courseData.modules.forEach((mod, mIdx) => {
+    if (!mod.name.trim()) errors.push(`Module ${mIdx + 1} Name`);
+    if (mod.items.length === 0) errors.push(`Module ${mIdx + 1} must have at least one item`);
+    
+    mod.items.forEach((item, iIdx) => {
+      const itemLoc = `Mod ${mIdx + 1}, Item ${iIdx + 1}`;
+      if (!item.title.trim()) errors.push(`${itemLoc}: Missing Title`);
+      
+if (item.type === 'video') {
+    if (!item.contentUrl.trim()) {
+      errors.push(`Module ${mIdx + 1}: Missing YouTube Link`);
+    } else {
+      // Test against the expanded regex
+      const isValid = ytPattern.test(item.contentUrl.trim());
+      if (!isValid) {
+        errors.push(`Module ${mIdx + 1}: The link provided is not a recognized YouTube format`);
+      }
+    }
+  }
+      
+      if (item.type === 'pdf') {
+        if (!item.contentUrl.trim()) errors.push(`${itemLoc}: Missing PDF Link`);
+        else if (!urlPattern.test(item.contentUrl)) errors.push(`${itemLoc}: Invalid PDF URL`);
+      }
+
+      if (item.type === 'quiz') {
+        if (!item.questions || item.questions.length === 0 || !item.questions[0].questionText.trim()) {
+          errors.push(`${itemLoc}: Inline Quiz needs at least one question`);
+        }
+      }
+    });
+  });
+
+  // --- 4. ERROR DISPLAY ---
+  if (errors.length > 0) {
+    setIsPublishing(false);
+    return toast.error(
+      <div className="text-left">
+        <b className="text-sm">Save Blocked! Please correct:</b>
+        <ul className="list-disc ml-4 text-[10px] mt-2 space-y-1">
+          {errors.map((err, idx) => <li key={idx}>{err}</li>)}
+        </ul>
+      </div>,
+      { duration: 3000 }
+    );
+  }
+
+  // --- 5. EXECUTION ---
+  setIsPublishing(true);
+  const loadingToast = toast.loading(courseViewMode === 'edit' ? "Saving Changes..." : "Publishing Course...");
+
+  try {
+    const data = new FormData();
+    data.append('title', courseData.title);
+    data.append('description', courseData.description);
+    data.append('price', sanitizedPrice); 
+    data.append('category', courseData.category);
+    data.append('duration', sanitizedDuration); 
+    data.append('level', courseData.level);
+    data.append('instructorId', user.id || user._id);
+    data.append('instructorName', user.name);
+    data.append('modules', JSON.stringify(courseData.modules));
+    
+    if (pdfFile) data.append('pdf', pdfFile);
+    if (imageFile) data.append('image', imageFile);
+
+    let savedCourseId = editingCourseId;
+
+    if (courseViewMode === 'edit') {
+      // API Update Call
+      await API.put(`/courses/${editingCourseId}`, data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    } else {
+      // API Create Call
+      const res = await API.post('/courses/create', data, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      savedCourseId = res.data._id;
+
+      // Handle Final Quiz Creation ONLY on initial Publish
+      if (quizData?.questions?.[0]?.questionText.trim()) {
+        await API.post('/quizzes/create', {
+          course: savedCourseId,
+          title: quizData.title || "Final Quiz",
+          questions: quizData.questions,
+          passingScore: quizData.passingScore || 80
+        });
+      }
+    }
+
+    toast.success(courseViewMode === 'edit' ? "Changes saved successfully!" : "Course and Quiz published!", { id: loadingToast });
+    resetForm();
+    await fetchMyCourses(); 
+    
+  } catch (err) {
+    console.error("Publishing Error:", err);
+    const serverError = err.response?.data?.error || "Server connection failed.";
+    toast.error(`Error: ${serverError}`, { id: loadingToast });
+  } finally {
+    setIsPublishing(false);
+  }
+};
   const handleAddLiveSession = async (courseId) => {
+    if (!newLiveSession.title.trim()) return toast.error("Enter session title");
+    if (!isValidUrl(newLiveSession.meetingLink)) return toast.error("Please enter a valid Meeting URL (https://...)");
+    if (!newLiveSession.date || !newLiveSession.time) return toast.error("Set date and time");
     if (!newLiveSession.title || !newLiveSession.meetingLink) return toast.error("Fill all session details");
     const isDuplicate = existingLiveSessions.some(s => s.meetingLink === newLiveSession.meetingLink && s._id !== editingSessionId);
     if (isDuplicate) return toast.error("This meeting link is already scheduled.");
@@ -306,7 +470,6 @@ try {
 
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-900">
-      <Toaster position="top-center" />
       
       {/* MOBILE HEADER */}
       <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-[100]">
@@ -317,10 +480,23 @@ try {
       {/* SIDEBAR */}
       <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-200 flex flex-col p-8 z-40 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <Link to="/" className="hidden lg:block text-2xl font-black text-blue-600 mb-12 tracking-tighter cursor-pointer">NextGen.</Link>
-        <nav className="space-y-3 flex-1">
-          {['overview', 'courses', 'progress'].map((tab) => (
-            <button key={tab} onClick={() => { setActiveTab(tab); setCourseViewMode('list'); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 p-4 rounded-2xl font-bold text-sm transition-all capitalize cursor-pointer ${activeTab === tab ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}>
-              {tab === 'overview' ? 'Dashboard Overview' : tab === 'courses' ? 'Course Management' : 'Student Progress'}
+<nav className="space-y-3 flex-1">
+          {[
+            { id: 'overview', label: 'Dashboard Overview' },
+            { id: 'courses', label: 'Course Management' },
+            { id: 'progress', label: 'Student Progress' }
+          ].map((item) => (
+            <button 
+              key={item.id} 
+              onClick={() => { 
+                setActiveTab(item.id); 
+                // Only reset to list if moving to a different category
+                if (activeTab !== 'courses') setCourseViewMode('list'); 
+                setIsSidebarOpen(false); 
+              }} 
+              className={`w-full flex items-center gap-3 p-4 rounded-2xl font-bold text-sm transition-all capitalize cursor-pointer ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
+            >
+              {item.label}
             </button>
           ))}
         </nav>
@@ -342,7 +518,10 @@ try {
             {courseViewMode === 'list' ? activeTab : (courseViewMode === 'edit' ? 'Edit Course' : 'Create Course')}
           </h2>
           {activeTab === 'courses' && courseViewMode === 'list' && (
-            <button onClick={() => setCourseViewMode('create')} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-blue-700 transition-all cursor-pointer">+ Create New Course</button>
+            <button onClick={() => {
+      resetForm(); // 🔥 This clears the old data first
+      setCourseViewMode('create'); // Then switches to the create view
+    }} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-xs shadow-lg hover:bg-blue-700 transition-all cursor-pointer">+ Create New Course</button>
           )}
         </div>
 
@@ -437,7 +616,57 @@ try {
                       <div className="flex grid grid-cols-3 md:flex gap-2 w-full md:w-auto">
                         <button onClick={() => navigate(`/course-view/${course._id}`)} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">View</button>
                         <button onClick={() => handleEditClick(course)} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-amber-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">Edit</button>
-                        <button onClick={() => { if(window.confirm("Permanently delete?")) API.delete(`/courses/${course._id}`).then(() => fetchMyCourses())}} className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer">Delete</button>
+                        <button 
+  onClick={() => {
+    toast((t) => (
+      <div className="flex flex-col gap-3">
+        <p className="text-xs font-bold text-slate-800">
+          Are you sure you want to delete <b>"{course.title}"</b>? 
+          This action cannot be undone.
+        </p>
+        <div className="flex gap-2 justify-end">
+          <button 
+            onClick={() => toast.dismiss(t.id)}
+            // 🔥 Added cursor-pointer
+            className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider hover:text-slate-600 transition-all cursor-pointer"
+          >
+            Cancel
+          </button>
+          <button 
+            onClick={async () => {
+              toast.dismiss(t.id);
+              const loadingToast = toast.loading("Removing course...");
+              try {
+                await API.delete(`/courses/${course._id}`);
+                toast.success("Course deleted successfully", { id: loadingToast });
+                fetchMyCourses();
+              } catch (err) {
+                toast.error("Delete failed.", { id: loadingToast });
+              }
+            }}
+            // 🔥 Added cursor-pointer
+            className="px-4 py-1.5 bg-red-500 text-white rounded-lg text-[10px] font-black uppercase tracking-wider shadow-md hover:bg-red-600 active:scale-95 transition-all cursor-pointer"
+          >
+            Confirm Delete
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 6000,
+      position: 'top-center',
+      style: {
+        borderRadius: '20px',
+        background: '#fff',
+        color: '#333',
+        border: '1px solid #fee2e2',
+        padding: '20px'
+      },
+    });
+  }} 
+  className="px-3 py-2 bg-slate-50 text-slate-600 rounded-xl hover:bg-red-500 hover:text-white transition-all font-bold text-[10px] uppercase cursor-pointer"
+>
+  Delete
+</button>
                       </div>
                     </div>
                   ))}
@@ -452,7 +681,14 @@ try {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 lg:gap-6 mb-6">
                         <input type="text" placeholder="Course Title" value={courseData.title} onChange={(e) => setCourseData({...courseData, title: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium focus:border-blue-600 outline-none" />
-                        <input type="text" placeholder="Price" value={courseData.price} onChange={(e) => setCourseData({...courseData, price: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium focus:border-blue-600 outline-none" />
+                        <input 
+                          type="text" 
+                          placeholder="Price (e.g. 49.99)" 
+                          value={courseData.price} 
+                          onChange={(e) => setCourseData({...courseData, price: e.target.value})} 
+                          onBlur={(e) => setCourseData({...courseData, price: formatPriceInput(e.target.value)})}
+                          className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium focus:border-blue-600 outline-none" 
+                        />
                         <select value={courseData.category} onChange={(e) => setCourseData({...courseData, category: e.target.value})} className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-medium outline-none cursor-pointer">
                           <option>Blockchain</option>
                           <option>Artificial Intelligence</option>
@@ -569,23 +805,58 @@ try {
                         {editingSessionId ? "Update Session" : "Post Live Schedule"}
                       </button>
 
-                      {existingLiveSessions.length > 0 && (
-                        <div className="mt-10 space-y-3">
-                          <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">Current Schedule</p>
-                          {existingLiveSessions.map((session, idx) => (
-                            <div key={idx} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all gap-4">
-                              <div>
-                                <h4 className="text-sm font-bold text-slate-800">{session.title}</h4>
-                                <p className="text-[10px] text-slate-500">{new Date(session.date).toLocaleDateString()} at {session.time}</p>
-                              </div>
-                              <div className="flex gap-4">
-                                <button onClick={() => handleEditLiveSession(session)} className="text-xs font-bold text-blue-600 hover:underline cursor-pointer">Edit</button>
-                                <button onClick={() => handleDeleteLiveSession(session._id)} className="text-xs font-bold text-red-400 hover:underline cursor-pointer">Delete</button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
+{/* 🔥 Logic: Only show the Current Schedule list if we are EDITING an existing course */}
+{courseViewMode === 'edit' && (
+  <div className="mt-10 space-y-3">
+    <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-4">
+      Current Course Schedule
+    </p>
+    
+    {existingLiveSessions.length > 0 ? (
+      existingLiveSessions.map((session, idx) => (
+        <div 
+          key={session._id || idx} 
+          className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 rounded-2xl border border-slate-100 hover:border-blue-200 transition-all gap-4 animate-in fade-in slide-in-from-top-2 duration-300"
+        >
+          <div>
+            <h4 className="text-sm font-bold text-slate-800">{session.title}</h4>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded font-bold uppercase">
+                Live
+              </span>
+              <p className="text-[10px] text-slate-500">
+                {new Date(session.date).toLocaleDateString()} at {session.time}
+              </p>
+            </div>
+          </div>
+          
+          <div className="flex gap-4 items-center">
+            <button 
+              onClick={() => handleEditLiveSession(session)} 
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer underline underline-offset-4"
+            >
+              Edit
+            </button>
+            <button 
+              onClick={() => handleDeleteLiveSession(session._id)} 
+              className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors cursor-pointer"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ))
+    ) : (
+      <div className="p-8 border-2 border-dashed border-slate-100 rounded-3xl text-center">
+        <p className="text-xs font-medium text-slate-400 italic">
+          No live sessions scheduled for this course yet.
+        </p>
+      </div>
+    )}
+  </div>
+)}
                     </div>
                   </div>
 

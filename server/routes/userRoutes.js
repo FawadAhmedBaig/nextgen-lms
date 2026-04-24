@@ -4,6 +4,7 @@ import Course from '../models/Course.js';
 import Enrollment from '../models/Enrollment.js';
 import authMiddleware from '../middleware/authMiddleware.js';
 import { getCourseProgress, updateProgress } from '../controllers/enrollmentController.js';
+import { validate, publicResolveSchema } from '../middleware/validateMiddleware.js';
 
 const router = express.Router();
 
@@ -108,7 +109,7 @@ router.get('/check-status/:courseId', authMiddleware, async (req, res) => {
 router.get('/course-progress/:courseId', authMiddleware, getCourseProgress);
 router.patch('/update-progress/:courseId', authMiddleware, updateProgress);
 
-router.get('/public-resolve/:studentId/:courseId', async (req, res) => {
+router.get('/public-resolve/:studentId/:courseId', validate(publicResolveSchema), async (req, res) => {
   try {
     const { studentId, courseId } = req.params;
 

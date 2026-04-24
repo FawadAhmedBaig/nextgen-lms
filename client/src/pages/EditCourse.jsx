@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 const EditCourse = () => {
   const { id } = useParams();
@@ -38,7 +38,6 @@ const fetchCourse = async () => {
 
   return (
     <div className="min-h-screen bg-slate-50 p-4 md:p-8 pt-24 lg:pt-32 font-['Plus_Jakarta_Sans']">
-      <Toaster />
       <div className="max-w-3xl mx-auto bg-white p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] shadow-xl border border-slate-100">
         <h1 className="text-xl md:text-2xl font-black mb-8 text-slate-900">
           Edit Course: <span className="text-blue-600">{formData.title}</span>

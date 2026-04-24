@@ -59,9 +59,9 @@ export const askTutor = async (req, res) => {
             : "No specific context found.";
 
         // 5. System Prompting
-        const systemInstruction = isQuizActive 
-            ? `You are "NextGen Tutor" in QUIZ MODE. Hint, don't tell.`
-            : `You are "NextGen Tutor," an expert academic assistant. Use Markdown and Headers.`;
+const systemInstruction = isQuizActive
+  ? "The student is taking a quiz. You are a supportive mentor. NEVER give direct answers. If they ask about a question, explain the underlying concept only."
+  : "You are an AI Tutor helping a student with their course content.";
 
         // 6. Groq Completion
         const completion = await groq.chat.completions.create({

@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
 const EditProfile = () => {
@@ -63,7 +63,6 @@ try {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans'] pt-24 md:pt-28 pb-12 px-4">
-      <Toaster position="top-center" />
       <div className="max-w-2xl mx-auto bg-white rounded-[2rem] md:rounded-[2.5rem] shadow-xl shadow-slate-200/60 overflow-hidden border border-slate-100">
         
         {/* Header Background */}

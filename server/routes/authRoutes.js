@@ -8,6 +8,9 @@ import User from '../models/User.js';
 import authMiddleware, { isAdmin } from '../middleware/authMiddleware.js'; // Import isAdmin
 import upload from '../middleware/upload.js';
 import Enrollment from '../models/Enrollment.js';
+import { validate, signupSchema, loginSchema, updateProfileSchema } from '../middleware/validateMiddleware.js';
+import dns from 'dns/promises';
+import sendMail from '../utils/sendMail.js';
 
 dotenv.config(); 
 
@@ -34,36 +37,145 @@ transporter.verify((error, success) => {
 });
 
 // --- SIGNUP ---
-router.post('/signup', async (req, res) => {
+router.post('/signup', validate(signupSchema), async (req, res) => {
   try {
     const { name, email, password, role } = req.body;
+    const normalizedEmail = email.toLowerCase();
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ error: "User already exists" });
+    // 1. --- RESILIENT DNS REALITY CHECK ---
+    const domain = normalizedEmail.split('@')[1];
+    let isDomainValid = false;
+
+    try {
+      // Step A: Attempt MX Record lookup with a 3-second timeout
+      const mxRecords = await Promise.race([
+        dns.resolveMx(domain),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+      ]);
+      
+      if (mxRecords && mxRecords.length > 0) isDomainValid = true;
+    } catch (dnsErr) {
+      // Step B: FALLBACK - If MX fails/timeouts, check for a basic A-Record (the website)
+      // This ensures that even if Oracle blocks MX queries, valid domains still pass.
+      try {
+        await dns.lookup(domain);
+        isDomainValid = true;
+      } catch (lookupErr) {
+        isDomainValid = false;
+      }
     }
 
+    if (!isDomainValid) {
+      return res.status(400).json({ error: "The email domain provided is unreachable or invalid." });
+    }
+
+    // 2. Check if user already exists
+    const userExists = await User.findOne({ email: normalizedEmail });
+    if (userExists) {
+      return res.status(400).json({ error: "User already exists with this email." });
+    }
+
+    // 3. Password Hashing
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
-    
+
+    // 4. OTP Generation
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpires = Date.now() + 10 * 60 * 1000;
+
+    // 5. Create "Pending" User
     const user = await User.create({ 
       name, 
-      email, 
+      email: normalizedEmail, 
       password_hash: hashedPassword, 
-      role: role || 'student'
+      role: role || 'student',
+      status: (role === 'instructor') ? 'pending' : 'active',
+      isVerified: false,
+      verificationCode: otp,
+      verificationExpires: otpExpires
     });
 
-    res.status(201).json({ 
-      message: "User registered successfully",
-      user: { id: user._id, name: user.name, email: user.email, role: user.role } 
-    });
+    // 6. Send OTP via utility
+    try {
+      await sendMail({
+        email: user.email,
+        subject: "Verify your NextGen LMS Account",
+        message: `Welcome to NextGen! Your verification code is: ${otp}`,
+        html: `
+          <div style="font-family: sans-serif; text-align: center; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
+            <h2 style="color: #2563eb;">Confirm Your Email</h2>
+            <p>Use the code below to finalize your registration:</p>
+            <div style="background: #f1f5f9; padding: 15px; font-size: 24px; font-weight: bold; letter-spacing: 5px; margin: 20px 0;">
+              ${otp}
+            </div>
+            <p style="color: #64748b; font-size: 12px;">Valid for 10 minutes.</p>
+          </div>
+        `
+      });
+
+      res.status(201).json({ 
+        message: "Verification code sent to your email. Please verify to continue.",
+        email: user.email 
+      });
+
+    } catch (mailErr) {
+      console.error("Mail Delivery Failed:", mailErr);
+      res.status(500).json({ error: "Account created but failed to send verification email." });
+    }
+
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
 });
 
+router.post('/verify-email', async (req, res) => {
+  try {
+    const { email, code } = req.body;
+    
+    // 1. Find user and normalize email
+    const user = await User.findOne({ email: email.toLowerCase() });
+
+    // Debugging Logs (Check your terminal)
+    console.log("--- Verification Attempt ---");
+    console.log("User Found:", !!user);
+    if (user) {
+      console.log("Stored Code:", user.verificationCode, "| Received Code:", code);
+      console.log("Stored Type:", typeof user.verificationCode, "| Received Type:", typeof code);
+      console.log("Is Expired:", user.verificationExpires < Date.now());
+    }
+
+    // 2. Validation with Type Casting
+    // We use String() to ensure we aren't comparing a Number to a String
+    if (
+      !user || 
+      String(user.verificationCode) !== String(code) || 
+      user.verificationExpires < Date.now()
+    ) {
+      return res.status(400).json({ message: "Invalid or expired verification code." });
+    }
+
+    // 3. Update User State
+    user.isVerified = true;
+    user.verificationCode = undefined;
+    user.verificationExpires = undefined;
+    
+    // Set status to active (Instructors remain 'pending' for admin approval)
+    if (user.role === 'student') {
+      user.status = 'active';
+    }
+
+    await user.save();
+    
+    res.json({ message: "Email verified successfully! You can now login." });
+
+  } catch (err) {
+    console.error("❌ Verification Route Error:", err);
+    res.status(500).json({ message: "Internal server error during verification." });
+  }
+});
+
 // --- LOGIN ---
-router.post('/login', async (req, res) => {
+router.post('/login', validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 
@@ -80,6 +192,12 @@ router.post('/login', async (req, res) => {
     // Inside router.post('/login', ...)
     if (user.role === 'instructor' && user.status === 'pending') {
         return res.status(403).json({ message: "Account pending admin approval." });
+    }
+
+    if (user.role === 'instructor' && !user.isApproved) {
+      return res.status(403).json({ 
+        message: "Your instructor account is currently pending approval. Please check back later." 
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password_hash);
@@ -184,32 +302,38 @@ router.post('/google-login', async (req, res) => {
     // 2. If user doesn't exist, create them
     if (!user) {
       const userRole = role || 'student';
-      // Instructors start as 'pending', Students as 'active'
-      const initialStatus = (userRole === 'instructor') ? 'pending' : 'active';
-
+      
+      // logic: Instructors start as 'pending', Students start as 'active'
+      const isInstructor = userRole === 'instructor';
+      
       user = new User({
         name: name || "Google User",
         email: email.toLowerCase(),
         profilePicture: avatar || "",
         role: userRole,
-        status: initialStatus,
-        // We DO NOT set password_hash or studentId here. 
-        // Mongoose will leave them as undefined/null safely.
+        status: isInstructor ? 'pending' : 'active',
+        isApproved: isInstructor ? false : true, // 🔥 Key Fix: Sync this with role
       });
 
       await user.save();
       console.log(`✅ New Google User Created: ${user.email} as ${user.role}`);
     }
 
-    // 3. Status Gatekeeper
+    // 3. Status Gatekeeper (The unified check)
     if (user.status === 'blocked') {
       return res.status(403).json({ message: "This account has been blocked by administrator." });
     }
 
-    if (user.role === 'instructor' && user.status === 'pending') {
-      return res.status(403).json({ 
-        message: "Your instructor account is pending admin approval. Please wait for verification." 
-      });
+    // 🔥 FIX: If the role is instructor, they MUST have status 'active' OR isApproved 'true'
+    // This allows the admin to update EITHER field and still let the user in.
+    if (user.role === 'instructor') {
+       const verified = user.isApproved === true || user.status === 'active';
+       
+       if (!verified) {
+         return res.status(403).json({ 
+           message: "Your instructor account is currently pending approval. Please check back later." 
+         });
+       }
     }
 
     // 4. Generate Token
@@ -235,18 +359,14 @@ router.post('/google-login', async (req, res) => {
   } catch (err) {
     console.error("❌ GOOGLE LOGIN BACKEND ERROR:", err);
     
-    // Check for common Duplicate Key Error (E11000)
     if (err.code === 11000) {
       return res.status(500).json({ 
         error: "Database Conflict", 
-        message: "A database index conflict occurred (likely studentId). Please clear your users collection." 
+        message: "A database index conflict occurred. Please ensure your user data is clean." 
       });
     }
 
-    res.status(500).json({ 
-      error: "Internal Server Error", 
-      details: err.message 
-    });
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
   }
 });
 router.get('/me', authMiddleware, async (req, res) => {
@@ -258,31 +378,55 @@ router.get('/me', authMiddleware, async (req, res) => {
   }
 });
 
-router.put('/update-profile', authMiddleware, upload.single('image'), async (req, res) => {
-  try {
-    const { name, bio } = req.body; 
-    const user = await User.findById(req.user.id);
+// 1. Move upload.single to the front
+// 2. Change key from 'image' to 'profilePicture'
+router.put('/update-profile', 
+  authMiddleware, 
+  upload.single('profilePicture'), // Multer runs early to parse the stream
+  validate(updateProfileSchema), 
+  async (req, res) => {
+    try {
+      const { name, bio } = req.body; 
+      const user = await User.findById(req.user.id);
 
-    if (name) user.name = name;
-    if (bio) user.bio = bio; 
-    if (req.file) user.profilePicture = req.file.path;
-
-    await user.save();
-
-    res.json({
-      message: "Profile updated",
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        bio: user.bio, 
-        profilePicture: user.profilePicture
+      if (!user) {
+        return res.status(404).json({ error: "User not found" });
       }
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+
+      // --- Logic: Only update if valid data is sent ---
+      // This prevents saving the literal string "undefined" or "null"
+      if (name && name.trim() !== "" && name !== "undefined" && name !== "null") {
+        user.name = name.trim();
+      }
+
+      // Bio can be an empty string, but not the string "null"
+      if (bio !== undefined && bio !== "null" && bio !== "undefined") {
+        user.bio = bio.trim();
+      } 
+      
+      // If a new file was successfully uploaded by Multer
+      if (req.file) {
+        user.profilePicture = req.file.path;
+      }
+
+      await user.save();
+
+      res.json({
+        message: "Profile updated successfully",
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          bio: user.bio, 
+          profilePicture: user.profilePicture
+        }
+      });
+    } catch (err) {
+      console.error("🔥 Profile Update Server Error:", err);
+      // Catching aborted requests or database conflicts
+      res.status(500).json({ error: "Server failed to process update. Try a smaller image." });
+    }
 });
 
 // --- NEW: ADMIN PANEL ROUTES (FR-11) ---

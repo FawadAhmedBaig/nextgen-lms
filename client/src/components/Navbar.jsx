@@ -1,21 +1,17 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom'; // 👈 Added useLocation
 import { io } from 'socket.io-client';
 import toast, { Toaster } from 'react-hot-toast';
-// DELETE standard axios
-// import axios from 'axios'; 
-
-// ADD your custom API instance
 import API from '../utils/api'; 
 
-// UPDATE Socket to use your Oracle IP from the environment
-// We'll use the same VITE_API_URL or a dedicated VITE_SOCKET_URL
 const socket = io(import.meta.env.VITE_API_URL, {
-  transports: ['websocket', 'polling'], // Forces compatibility
+  transports: ['websocket', 'polling'],
   withCredentials: true
 });
+
 export default function Navbar() {
   const navigate = useNavigate();
+  const location = useLocation(); // 👈 Initialize location hook
   const [isOpen, setIsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isNotiOpen, setIsNotiOpen] = useState(false);
@@ -23,14 +19,14 @@ export default function Navbar() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
 
+  // 🔥 Helper function to check if a link is active
+  const isActive = (path) => location.pathname === path;
+
   const fetchNotifications = useCallback(async () => {
     try {
       const token = localStorage.getItem('token');
       if (!token) return;
-
-      // API instance already has the baseURL and Auth header injected
       const res = await API.get('/notifications');
-      
       setNotifications(res.data);
       setUnreadCount(res.data.filter(n => !n.isRead).length);
     } catch (err) {
@@ -38,17 +34,34 @@ export default function Navbar() {
     }
   }, []);
 
-  const syncUser = useCallback(() => {
+const syncUser = useCallback(() => {
     const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      socket.emit('register_user', parsedUser.id || parsedUser._id);
-      fetchNotifications();
+    const token = localStorage.getItem('token'); // 🔥 Added token check
+
+    // 🔥 If token is missing OR user data is missing, treat as logged out
+    if (storedUser && token) {
+      try {
+        const parsedUser = JSON.parse(storedUser);
+        const userId = parsedUser.id || parsedUser._id;
+        
+        setUser(parsedUser);
+        
+        if (userId) {
+          socket.emit('register_user', userId);
+        }
+        
+        fetchNotifications();
+      } catch (err) {
+        console.error("Error parsing user data:", err);
+        setUser(null);
+      }
     } else {
+      // 🔥 This ensures the Navbar switches back to Login/Signup buttons
       setUser(null);
       setNotifications([]);
       setUnreadCount(0);
+      // Optional: if you want to force redirect on token loss
+      // navigate('/login'); 
     }
   }, [fetchNotifications]);
 
@@ -87,19 +100,36 @@ export default function Navbar() {
     navigate('/login');
   };
 
-  const markAsRead = async (id) => {
+  const markAsRead = async (noti) => {
     try {
-      // Use the API instance with the relative path and empty object for PATCH body
-      await API.patch(`/notifications/${id}/read`, {});
-      fetchNotifications();
+      const notiId = noti._id || noti.id;
+      if (!noti.isRead) {
+        await API.patch(`/notifications/${notiId}/read`, {});
+        setNotifications(prev => 
+          prev.map(n => (n._id === notiId ? { ...n, isRead: true } : n))
+        );
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+      setIsNotiOpen(false);
+      if (noti.path) navigate(noti.path);
     } catch (err) {
-      console.error("Error marking notification as read", err);
+      console.error("❌ Notification Click Error:", err);
     }
   };
 
   return (
     <nav className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 font-['Plus_Jakarta_Sans']">
-      <Toaster />
+      <Toaster 
+  position="top-center" 
+  reverseOrder={false} 
+  toastOptions={{
+    duration: 5000,
+    style: {
+      fontFamily: 'Plus Jakarta Sans, sans-serif',
+      borderRadius: '12px',
+    },
+  }} 
+/>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           
@@ -111,17 +141,37 @@ export default function Navbar() {
             <span className="font-bold text-xl md:text-2xl tracking-tight text-slate-900">NextGen LMS</span>
           </Link>
 
-          {/* DESKTOP LINKS */}
-          <div className="hidden md:flex space-x-8 text-sm font-semibold text-slate-600">
-            <Link to="/" className="hover:text-blue-600 transition cursor-pointer">Home</Link>
-            {user?.role === 'instructor' ? (
-              <Link to="/instructor-dashboard" className="text-blue-600 font-bold hover:opacity-80 transition cursor-pointer">
-                Instructor Studio
-              </Link>
-            ) : (
-              <Link to="/courses" className="hover:text-blue-600 transition cursor-pointer">Courses</Link>
-            )}
-            <Link to="/verify" className="hover:text-blue-600 transition cursor-pointer">Verify</Link>
+          {/* DESKTOP LINKS - 🔥 Conditional Blue Styling Added */}
+          <div className="hidden md:flex space-x-8 text-sm font-semibold">
+            <Link 
+              to="/" 
+              className={`transition cursor-pointer ${isActive('/') ? 'text-blue-600 font-bold' : 'text-slate-600 hover:text-blue-600'}`}
+            >
+              Home
+            </Link>
+            
+{user?.role === 'instructor' ? (
+  <Link 
+    to="/instructor-dashboard" 
+    className={`transition cursor-pointer ${isActive('/instructor-dashboard') ? 'text-blue-600 font-extrabold' : 'text-slate-600 font-semibold hover:text-blue-600'}`}
+  >
+    Instructor Studio
+  </Link>
+) : (
+  <Link 
+    to="/courses" 
+    className={`transition cursor-pointer ${isActive('/courses') ? 'text-blue-600 font-bold' : 'text-slate-600 hover:text-blue-600'}`}
+  >
+    Courses
+  </Link>
+)}
+            
+            <Link 
+              to="/verify" 
+              className={`transition cursor-pointer ${isActive('/verify') ? 'text-blue-600 font-bold' : 'text-slate-600 hover:text-blue-600'}`}
+            >
+              Verify
+            </Link>
           </div>
 
           <div className="flex items-center gap-2 md:gap-4">
@@ -151,7 +201,7 @@ export default function Navbar() {
                       <div className="max-h-96 overflow-y-auto">
                         {notifications.length > 0 ? (
                           notifications.map((noti) => (
-                            <div key={noti._id} onClick={() => { markAsRead(noti._id); setIsNotiOpen(false); }} className={`px-4 py-4 border-b border-gray-50 hover:bg-slate-50 transition cursor-pointer relative ${!noti.isRead ? 'bg-blue-50/30' : ''}`}>
+                            <div key={noti._id} onClick={() => markAsRead(noti)} className={`px-4 py-4 border-b border-gray-50 hover:bg-slate-50 transition cursor-pointer relative ${!noti.isRead ? 'bg-blue-50/30' : ''}`}>
                               {!noti.isRead && <div className="absolute left-1 top-1/2 -translate-y-1/2 w-1 h-8 bg-blue-600 rounded-r-full"></div>}
                               <p className={`text-sm ${!noti.isRead ? 'font-bold text-slate-900' : 'text-slate-700'}`}>{noti.title}</p>
                               <p className="text-xs text-slate-500 mt-1 line-clamp-2">{noti.message}</p>
@@ -167,7 +217,6 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Auth Actions / Profile Dropdown (Desktop) */}
             {!user ? (
               <div className="hidden md:flex items-center gap-4">
                 <Link to="/login" className="text-sm font-bold text-slate-700 hover:text-blue-600 transition cursor-pointer">Log in</Link>
@@ -176,7 +225,7 @@ export default function Navbar() {
             ) : (
               <div className="hidden md:block relative">
                 <button onClick={() => { setIsOpen(!isOpen); setIsNotiOpen(false); }} className="flex items-center gap-2 cursor-pointer group">
-                  <div className="w-10 h-10 rounded-full bg-blue-100 border-2 border-blue-600 flex items-center justify-center text-blue-600 font-bold overflow-hidden transition-all group-hover:ring-4 group-hover:ring-blue-50">
+                  <div className={`w-10 h-10 rounded-full border-2 flex items-center justify-center font-bold overflow-hidden transition-all group-hover:ring-4 group-hover:ring-blue-50 ${isActive('/profile') ? 'border-blue-600 bg-blue-50' : 'border-blue-600 bg-blue-100'}`}>
                     {user.profilePicture ? <img src={user.profilePicture} alt="P" className="w-full h-full object-cover" /> : (user.name?.charAt(0).toUpperCase() || 'U')}
                   </div>
                 </button>
@@ -188,11 +237,24 @@ export default function Navbar() {
                         <p className="text-xs text-slate-500 font-medium">Signed in as</p>
                         <p className="text-sm font-bold text-slate-900 truncate">{user.name}</p>
                       </div>
-                      {/* Hide Profile for Admin */}
                       {user.role !== 'admin' && (
-                        <Link to="/profile" className="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-blue-600" onClick={() => setIsOpen(false)}>Profile</Link>
+                        <Link 
+                          to="/profile" 
+                          className={`block px-4 py-3 text-sm font-semibold hover:bg-slate-50 ${isActive('/profile') ? 'text-blue-600 bg-blue-50/20' : 'text-slate-700'}`} 
+                          onClick={() => setIsOpen(false)}
+                        >
+                          Profile
+                        </Link>
                       )}
-                      {user.role === 'student' && <Link to="/my-courses" className="block px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-50" onClick={() => setIsOpen(false)}>My Learning</Link>}
+                      {user.role === 'student' && (
+                        <Link 
+                          to="/my-courses" 
+                          className={`block px-4 py-3 text-sm font-semibold hover:bg-slate-50 ${isActive('/my-courses') ? 'text-blue-600 bg-blue-50/20' : 'text-slate-700'}`} 
+                          onClick={() => setIsOpen(false)}
+                        >
+                          My Learning
+                        </Link>
+                      )}
                       <button onClick={handleLogout} className="w-full text-left cursor-pointer block px-4 py-3 text-sm font-semibold text-red-600 hover:bg-red-50">Logout</button>
                     </div>
                   </>
@@ -200,7 +262,6 @@ export default function Navbar() {
               </div>
             )}
 
-            {/* Mobile Hamburger Toggle */}
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2 text-slate-600 hover:bg-slate-100 rounded-xl transition-all cursor-pointer">
               {isMobileMenuOpen ? (
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -212,24 +273,36 @@ export default function Navbar() {
         </div>
       </div>
 
-      {/* MOBILE MENU PANEL */}
+      {/* MOBILE MENU PANEL - 🔥 Updated Active Styling */}
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white border-b border-slate-100 animate-in slide-in-from-top-5 duration-300">
           <div className="px-4 pt-2 pb-6 space-y-2">
-            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-base font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-600 rounded-xl transition-colors">Home</Link>
+            <Link to="/" onClick={() => setIsMobileMenuOpen(false)} className={`block px-4 py-3 text-base font-bold rounded-xl transition-colors ${isActive('/') ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-600'}`}>Home</Link>
             
-            {user?.role === 'instructor' ? (
-              <Link to="/instructor-dashboard" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-base font-bold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">Instructor Studio</Link>
-            ) : (
-              <Link to="/courses" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-base font-bold text-slate-700 hover:bg-blue-50 rounded-xl transition-colors">Courses</Link>
-            )}
+{user?.role === 'instructor' ? (
+  <Link 
+    to="/instructor-dashboard" 
+    onClick={() => setIsMobileMenuOpen(false)} 
+    className={`block px-4 py-3 text-base font-bold rounded-xl transition-colors ${isActive('/instructor-dashboard') ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-600'}`}
+  >
+    Instructor Studio
+  </Link>
+) : (
+  <Link 
+    to="/courses" 
+    onClick={() => setIsMobileMenuOpen(false)} 
+    className={`block px-4 py-3 text-base font-bold rounded-xl transition-colors ${isActive('/courses') ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-600'}`}
+  >
+    Courses
+  </Link>
+)}
             
-            <Link to="/verify" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-base font-bold text-slate-700 hover:bg-blue-50 rounded-xl transition-colors">Verify Credentials</Link>
+            <Link to="/verify" onClick={() => setIsMobileMenuOpen(false)} className={`block px-4 py-3 text-base font-bold rounded-xl transition-colors ${isActive('/verify') ? 'text-blue-600 bg-blue-50' : 'text-slate-700 hover:bg-blue-50 hover:text-blue-600'}`}>Verify Credentials</Link>
             
             {user ? (
               <div className="pt-4 border-t border-slate-100">
                 <div className="flex items-center gap-3 px-4 mb-4">
-                   <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold overflow-hidden">
+                   <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold overflow-hidden ${isActive('/profile') ? 'ring-2 ring-blue-600 bg-blue-50' : 'bg-blue-100'}`}>
                      {user.profilePicture ? <img src={user.profilePicture} alt="P" className="w-full h-full object-cover" /> : user.name?.charAt(0).toUpperCase()}
                    </div>
                    <div>
@@ -237,11 +310,10 @@ export default function Navbar() {
                      <p className="text-xs text-slate-500 uppercase font-black">{user.role}</p>
                    </div>
                 </div>
-                {/* Hide Profile for Admin in Mobile Menu too */}
                 {user.role !== 'admin' && (
-                  <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-sm font-bold text-slate-600 hover:text-blue-600">Profile Settings</Link>
+                  <Link to="/profile" onClick={() => setIsMobileMenuOpen(false)} className={`block px-4 py-3 text-sm font-bold rounded-xl ${isActive('/profile') ? 'text-blue-600 bg-blue-50' : 'text-slate-600'}`}>Profile Settings</Link>
                 )}
-                {user.role === 'student' && <Link to="/my-courses" onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-3 text-sm font-bold text-slate-600">My Learning</Link>}
+                {user.role === 'student' && <Link to="/my-courses" onClick={() => setIsMobileMenuOpen(false)} className={`block px-4 py-3 text-sm font-bold rounded-xl ${isActive('/my-courses') ? 'text-blue-600 bg-blue-50' : 'text-slate-600'}`}>My Learning</Link>}
                 <button onClick={handleLogout} className="w-full text-left px-4 py-3 text-sm font-bold text-red-600">Sign Out</button>
               </div>
             ) : (

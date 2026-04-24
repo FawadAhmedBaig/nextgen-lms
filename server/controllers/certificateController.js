@@ -5,6 +5,21 @@ import Notification from '../models/Notification.js';
 import { issueBlockchainCert } from '../utils/blockchainService.js';
 import Enrollment from '../models/Enrollment.js'; 
 import mongoose from 'mongoose';
+import Certificate from '../models/Certificate.js';
+
+export const getMyCertificates = async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+
+    // Change 'user' to match the field name in your Certificate Model
+    const certificates = await Certificate.find({ user: userId }).sort({ createdAt: -1 });
+    
+    res.status(200).json(certificates);
+  } catch (error) {
+    console.error("Error fetching certificates:", error);
+    res.status(500).json({ message: "Failed to fetch certificates" });
+  }
+};
 
 export const generateCertificate = async (req, res) => {
   let browser = null; 
@@ -45,7 +60,22 @@ export const generateCertificate = async (req, res) => {
       }
     }
 
-    // Generate the QR Code using the txnHash
+// --- ADD THIS BLOCK HERE ---
+    // This creates the database record for the Profile page to find
+    const existingCertRecord = await Certificate.findOne({ transactionHash: txnHash });
+    if (!existingCertRecord) {
+      await Certificate.create({
+        user: userObjId,            // Matches Profile.jsx lookup
+        courseId: courseObjId,
+        courseName: courseTitle,
+        transactionHash: txnHash,   // The Polygon Hash
+        certificateHash: certHash   // The unique Cert ID
+      });
+      console.log("💾 SUCCESS: Certificate record saved to Database.");
+    }
+    // ---------------------------
+
+    // Generate the QR Code using the txnHash (your existing code follows...)
     const qrCodeData = await QRCode.toDataURL(`https://amoy.polygonscan.com/tx/${txnHash}`);
 
     // --- YOUR EXACT HTML CONTENT & DESIGN ---
@@ -157,14 +187,17 @@ export const generateCertificate = async (req, res) => {
 
     // 3. Launch Puppeteer
 // 3. Launch Puppeteer
-browser = await puppeteer.launch({ // ✅ Now it uses the 'let' variable from the top
-  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
+browser = await puppeteer.launch({ 
+  // 🔥 If env variable exists (for production), use it. 
+  // Otherwise, set to undefined so it works on your Windows machine.
+  executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || undefined,
   args: [
     '--no-sandbox', 
     '--disable-setuid-sandbox', 
     '--disable-dev-shm-usage', 
     '--disable-gpu'
-  ]
+  ],
+  headless: "new" // Best practice for newer Puppeteer versions
 });
 
     const page = await browser.newPage();
@@ -181,25 +214,28 @@ browser = await puppeteer.launch({ // ✅ Now it uses the 'let' variable from th
     await browser.close();
     browser = null;
 
-    // --- NOTIFICATION HANDLER ---
-    try {
-      if (userId) {
-        const io = req.app.get('socketio');
-        const notiData = {
-          recipient: userId,
-          type: 'certificate',
-          title: 'Certificate Issued! 🎓',
-          message: `Your certificate for ${courseTitle} is ready and verified on Polygon.`
-        };
-        await Notification.create(notiData);
-        const recipientSocket = onlineUsers.get(userId);
-        if (recipientSocket) {
-          io.to(recipientSocket).emit('notification_received', notiData);
-        }
-      }
-    } catch (notiErr) {
-      console.error("Notification failed:", notiErr.message);
+// --- NOTIFICATION HANDLER ---
+try {
+  if (userId) {
+    const io = req.app.get('socketio');
+    const notiData = {
+      recipient: userId,
+      type: 'certificate',
+      title: 'Certificate Issued! 🎓',
+      message: `Your certificate for ${courseTitle} is ready and verified on Polygon.`,
+      // 🔥 Updated: Points to the specific course view and passes a tab parameter
+      path: `/course-view/${courseId}?tab=certificates` 
+    };
+    await Notification.create(notiData);
+    
+    const recipientSocket = onlineUsers.get(userId);
+    if (recipientSocket) {
+      io.to(recipientSocket).emit('notification_received', notiData);
     }
+  }
+} catch (notiErr) {
+  console.error("Notification failed:", notiErr.message);
+}
 
     // 5. Send PDF
     res.set({

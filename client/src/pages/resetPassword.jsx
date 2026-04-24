@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -30,7 +30,6 @@ try {
   return (
     // Added responsive padding: p-4 for small mobile, p-6 for tablet+
     <div className="min-h-screen flex items-center justify-center bg-slate-50 font-['Plus_Jakarta_Sans'] p-4 md:p-6">
-      <Toaster />
       
       {/* Container: Full width on small screens, capped at max-md on desktop */}
       <div className="w-full max-w-md bg-white rounded-[2rem] md:rounded-[2.5rem] p-6 md:p-10 shadow-xl border border-slate-100">

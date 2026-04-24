@@ -46,7 +46,20 @@ const userSchema = new mongoose.Schema({
     enum: ['active', 'blocked', 'pending'], 
     default: 'active' 
   },
+
+  // --- 🔥 NEW: EMAIL VERIFICATION FIELDS ---
+  isVerified: { 
+    type: Boolean, 
+    default: false 
+  },
+  verificationCode: { 
+    type: String 
+  },
+  verificationExpires: { 
+    type: Date 
+  },
   
+  // --- EXISTING RESET LOGIC ---
   resetPasswordToken: String,
   resetPasswordExpires: Date
 }, { timestamps: true });

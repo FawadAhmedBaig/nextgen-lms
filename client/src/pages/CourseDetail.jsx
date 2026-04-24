@@ -28,40 +28,57 @@ export default function CourseDetail() {
     window.scrollTo(0, 0);
   }, [id, navigate]);
 
-  const handleEnrollment = async () => {
-    const token = localStorage.getItem('token');
-    
-    if (!token) {
-      toast.error("Please login to enroll");
-      return navigate('/login');
+const handleEnrollment = async () => {
+  const token = localStorage.getItem('token');
+  
+  // 1. Pre-check for Auth
+  if (!token) {
+    toast.error("Please login to enroll");
+    return navigate('/login');
+  }
+
+  // 2. Logic to determine if course is Free
+  const isFree = course.price === "0" || course.price === "Free" || !course.price;
+
+  if (isFree) {
+    if (enrolling) return; // Prevent double clicks
+    setEnrolling(true);
+
+    // 🔥 Use a unique ID to prevent "Stuck Toasts"
+    const toastId = `enroll-${course._id}`;
+    toast.loading("Securing your spot in the course...", { id: toastId });
+
+    try {
+      // API call to handle enrollment
+      await API.post(`/users/enroll/${course._id}`, {});
+
+      // 🔥 Replace the loading toast with success before navigating
+      toast.success("Enrolled Successfully! Welcome aboard. 🎓", { 
+        id: toastId,
+        duration: 3000 
+      });
+
+      // Navigate to success page
+      navigate('/order-complete', { 
+        state: { 
+          course: course,
+          orderId: `FREE-${Math.random().toString(36).substr(2, 9).toUpperCase()}` 
+        } 
+      });
+    } catch (err) {
+      console.error("Enrollment Error:", err);
+      const errorMsg = err.response?.data?.message || "Enrollment failed. Try again.";
+      
+      // 🔥 Replace the loading toast with error
+      toast.error(errorMsg, { id: toastId });
+    } finally {
+      setEnrolling(false);
     }
-
-    const isFree = course.price === "0" || course.price === "Free" || !course.price;
-
-    if (isFree) {
-      setEnrolling(true);
-      const loadingToast = toast.loading("Processing your enrollment...");
-      try {
-        // No need to manually pass headers or full URL
-        await API.post(`/users/enroll/${course._id}`, {});
-
-        toast.success("Enrolled Successfully!", { id: loadingToast });
-        
-        navigate('/order-complete', { 
-          state: { 
-            course: course,
-            orderId: `FREE-${Math.random().toString(36).substr(2, 9).toUpperCase()}` 
-          } 
-        });
-      } catch (err) {
-        toast.error(err.response?.data?.message || "Enrollment failed", { id: loadingToast });
-      } finally {
-        setEnrolling(false);
-      }
-    } else {
-      navigate('/checkout', { state: { courseId: course._id } });
-    }
-  };
+  } else {
+    // Paid course path
+    navigate('/checkout', { state: { courseId: course._id } });
+  }
+};
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center font-black text-slate-300 animate-pulse uppercase tracking-widest bg-white">
@@ -71,7 +88,6 @@ export default function CourseDetail() {
 
   return (
     <div className="min-h-screen bg-white font-['Plus_Jakarta_Sans'] pb-20">
-      <Toaster position="top-right" />
       
       {/* --- HERO SECTION --- */}
       <section className="bg-slate-900 pt-14 pb-16 md:pt-18 md:pb-28 relative overflow-hidden min-h-[600px] flex items-center">
@@ -91,9 +107,13 @@ export default function CourseDetail() {
               
               <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 mt-10 text-slate-300 text-sm font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-3">
-                   <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-sm border-2 border-slate-700 shadow-xl overflow-hidden">
-                     {course.instructor?.name?.charAt(0)}
-                   </div>
+<div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-black text-sm border-2 border-slate-700 shadow-xl overflow-hidden">
+  {course.instructor?.profilePicture ? (
+    <img src={course.instructor.profilePicture} alt="P" className="w-full h-full object-cover" />
+  ) : (
+    course.instructor?.name?.charAt(0)
+  )}
+</div>
                    <span className="text-white">{course.instructor?.name}</span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -199,9 +219,13 @@ export default function CourseDetail() {
          <div className="mt-20 p-8 md:p-12 bg-slate-50 rounded-[3rem] border border-slate-100 relative overflow-hidden">
             <h3 className="text-xl font-black text-slate-900 mb-8 uppercase tracking-widest relative z-10">Lead Expert</h3>
             <div className="flex flex-col md:flex-row gap-10 items-center md:items-start relative z-10">
-               <div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-2xl border-4 border-white shrink-0">
-                 {course.instructor?.name?.charAt(0)}
-               </div>
+<div className="w-24 h-24 rounded-full bg-blue-600 flex items-center justify-center text-white text-3xl font-black shadow-2xl border-4 border-white shrink-0 overflow-hidden">
+  {course.instructor?.profilePicture ? (
+    <img src={course.instructor.profilePicture} alt="Instructor" className="w-full h-full object-cover" />
+  ) : (
+    course.instructor?.name?.charAt(0)
+  )}
+</div>
                <div className="text-center md:text-left">
                   <h4 className="text-2xl font-bold text-slate-900">{course.instructor?.name}</h4>
                   <p className="text-blue-600 font-bold text-[10px] uppercase tracking-[0.2em] mb-4">Curriculum Developer @ NextGen</p>

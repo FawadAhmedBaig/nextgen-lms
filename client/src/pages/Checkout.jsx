@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import API from '../utils/api';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
@@ -173,7 +173,6 @@ const Checkout = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 pt-20 lg:pt-24 pb-20 font-['Plus_Jakarta_Sans']">
-      <Toaster position="top-center" />
       <div className="max-w-6xl mx-auto px-6 lg:px-8">
         <div className="mb-10 text-center lg:text-left">
           <h1 className="text-3xl lg:text-4xl font-black text-slate-900 mb-2 uppercase tracking-tighter">Secure Checkout</h1>

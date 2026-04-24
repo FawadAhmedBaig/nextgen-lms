@@ -1,6 +1,24 @@
 @import "tailwindcss";
 
-/* Typography and Markdown fixes */
+/* 1. Global Viewport and Background Fixes */
+html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    /* Prevents horizontal overflow at extreme zoom levels */
+    overflow-x: hidden; 
+    /* Ensures a consistent base color for the "infinite canvas" */
+    background-color: #f8fafc; /* Matches Tailwind slate-50 */
+    scroll-behavior: smooth;
+}
+
+/* 2. Responsive Box Model */
+#root {
+    width: 100%;
+    min-height: 100vh;
+}
+
+/* --- Your Existing Typography and Markdown fixes --- */
 .markdown-content ul {
     list-style-type: disc !important;
     padding-left: 1.2rem !important;

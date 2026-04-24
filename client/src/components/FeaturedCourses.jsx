@@ -7,36 +7,40 @@ export default function FeaturedCourses() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
-useEffect(() => {
-  const fetchPopularCourses = async () => {
-try {
-      // Use the API instance with the relative path
-      const { data } = await API.get('/courses/popular');
-      setCourses(data);
-    } catch (err) {
-      console.error("Failed to fetch popular courses", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-  fetchPopularCourses();
-}, []);
+  useEffect(() => {
+    const fetchPopularCourses = async () => {
+      try {
+        const { data } = await API.get('/courses/popular');
+        setCourses(data);
+      } catch (err) {
+        console.error("Failed to fetch popular courses", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchPopularCourses();
+  }, []);
 
-  // Loading state with your Plus Jakarta Sans aesthetic
   if (loading) {
     return (
-      <div className="py-20 text-center font-black text-slate-200 animate-pulse uppercase tracking-widest">
+      <div className="py-20 text-center font-black text-slate-200 animate-pulse uppercase tracking-widest bg-white w-full">
         Loading Featured Content...
       </div>
     );
   }
 
-  // Safety: Don't show the section if the DB is empty
   if (courses.length === 0) return null;
 
   return (
-    <section className="py-12 md:py-20 bg-white font-['Plus_Jakarta_Sans']">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
+    /* LAYER 1: FULL-WIDTH SECTION WRAPPER 
+       Ensures the 'bg-white' stretches to the edges of any screen.
+    */
+    <section className="w-full bg-white font-['Plus_Jakarta_Sans']">
+      
+      {/* LAYER 2: CONSTRAINED CONTENT CONTAINER
+         max-w-[1440px] matches your Layout.jsx for perfect vertical alignment.
+      */}
+      <div className="max-w-[1440px] mx-auto py-12 md:py-20 px-4 md:px-8">
         
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-center sm:items-end gap-4 mb-10 md:mb-12 text-center sm:text-left">
@@ -54,7 +58,6 @@ try {
           {courses.map(course => (
             <div 
               key={course._id} 
-              /* 🔥 NAVIGATES TO PUBLIC DETAIL PAGE FIRST */
               onClick={() => navigate(`/course/${course._id}`)}
               className="group bg-white rounded-[2rem] border border-gray-100 overflow-hidden hover:shadow-2xl hover:-translate-y-2 transition-all duration-500 cursor-pointer"
             >

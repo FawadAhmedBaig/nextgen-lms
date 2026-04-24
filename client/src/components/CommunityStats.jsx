@@ -12,7 +12,6 @@ export default function CommunityStats() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // We now use the relative path. API instance handles the rest.
         const { data } = await API.get('/courses/public-stats');
         
         setCounts({
@@ -23,7 +22,6 @@ export default function CommunityStats() {
         });
       } catch (err) {
         console.error("Stats fetch failed, using fallback.");
-        // Stay with hardcoded defaults if backend is unreachable
         setCounts({
           students: '50K+',
           mentors: '1.2K+',
@@ -43,8 +41,17 @@ export default function CommunityStats() {
   ];
 
   return (
-    <section className="py-12 md:py-20 bg-gray-50 font-['Plus_Jakarta_Sans']">
-      <div className="max-w-7xl mx-auto px-4 md:px-8">
+    /* LAYER 1: FULL-WIDTH WRAPPER 
+       The 'bg-gray-50' now covers the entire browser width.
+    */
+    <section className="w-full bg-gray-50 font-['Plus_Jakarta_Sans']">
+      
+      {/* LAYER 2: CONSTRAINED CONTENT CONTAINER
+         This keeps the white card aligned with the Hero and Navbar.
+      */}
+      <div className="max-w-[1440px] mx-auto py-12 md:py-20 px-4 md:px-8">
+        
+        {/* The White Card remains centered and elegant */}
         <div className="bg-white rounded-[2.5rem] md:rounded-[3.5rem] p-8 md:p-16 shadow-xl shadow-gray-200/40 border border-gray-100">
           
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-4 md:gap-8 text-center">
@@ -56,6 +63,7 @@ export default function CommunityStats() {
                 <p className="text-gray-400 text-[10px] md:text-xs font-black uppercase tracking-[0.2em] px-2">
                   {stat.label}
                 </p>
+                {/* Visual separator for mobile */}
                 <div className="sm:hidden w-8 h-1 bg-gray-100 mx-auto rounded-full mt-6" />
               </div>
             ))}
