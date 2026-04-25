@@ -38,27 +38,52 @@ const seedData = async () => {
     const hashedPass = await bcrypt.hash("password123", salt);
     
 // 2. Create Users
-    const testStudent = await User.create({
-      name: "Fawad Ahmed", email: "fawad@test.com", password_hash: hashedPass,
-      role: 'student', status: 'active', studentId: "STU-F-12345", bio: "Final year BS CS Student"
-    });
-    
-    const testAdmin = await User.create({
-      name: "System Admin", email: "admin@test.com", password_hash: hashedPass,
-      role: 'admin', status: 'active', studentId: "ADM-G-99999", bio: "Platform Administrator"
-    });
+// 2. Create Users
+const testStudent = await User.create({
+  name: "Fawad Ahmed", 
+  email: "fawad@test.com", 
+  password_hash: hashedPass,
+  role: 'student', 
+  status: 'active', 
+  studentId: "STU-F-12345", 
+  bio: "Final year BS CS Student",
+  isVerified: true // 🔥 Add this
+});
 
-    // Existing Instructor
-    const approvedInstructor = await User.create({
-      name: "Dr. Saleem Ullah", email: "saleem@test.com", password_hash: hashedPass,
-      role: 'instructor', status: 'active', studentId: "INST-S-001", bio: "Head of CS Department"
-    });
+const testAdmin = await User.create({
+  name: "System Admin", 
+  email: "admin@test.com", 
+  password_hash: hashedPass,
+  role: 'admin', 
+  status: 'active', 
+  studentId: "ADM-G-99999", 
+  bio: "Platform Administrator",
+  isVerified: true // 🔥 Add this
+});
 
-    // 🔥 NEW: 2nd Instructor
-    const secondInstructor = await User.create({
-      name: "Dr. Shahzad Hussain", email: "shahzad@test.com", password_hash: hashedPass,
-      role: 'instructor', status: 'active', studentId: "INST-S-002", bio: "Professor of Data Science & Web Engineering"
-    });
+// Existing Instructor
+const approvedInstructor = await User.create({
+  name: "Dr. Saleem Ullah", 
+  email: "saleem@test.com", 
+  password_hash: hashedPass,
+  role: 'instructor', 
+  status: 'active', 
+  studentId: "INST-S-001", 
+  bio: "Head of CS Department",
+  isVerified: true // 🔥 Add this
+});
+
+// 🔥 NEW: 2nd Instructor
+const secondInstructor = await User.create({
+  name: "Dr. Shahzad Hussain", 
+  email: "shahzad@test.com", 
+  password_hash: hashedPass,
+  role: 'instructor', 
+  status: 'active', 
+  studentId: "INST-S-002", 
+  bio: "Professor of Data Science & Web Engineering",
+  isVerified: true // 🔥 Add this
+});
 
     console.log("✅ Users Created (2 Instructors).");
 

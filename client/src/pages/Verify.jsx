@@ -94,7 +94,7 @@ try {
               <button 
                 type="submit"
                 disabled={isVerifying}
-                className="w-full md:w-auto bg-blue-600 text-white px-8 md:px-10 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-3 disabled:opacity-50 min-w-[160px] text-sm"
+                className="w-full md:w-auto bg-blue-600 text-white cursor-pointer px-8 md:px-10 py-3.5 md:py-4 rounded-xl md:rounded-2xl font-bold hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 flex items-center justify-center gap-3 disabled:opacity-50 min-w-[160px] text-sm"
               >
                 {isVerifying ? 'Searching...' : 'Verify Now'}
               </button>

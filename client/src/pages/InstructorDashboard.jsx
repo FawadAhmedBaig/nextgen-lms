@@ -469,50 +469,86 @@ if (item.type === 'video') {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-900">
+<div className="flex flex-col lg:flex-row h-screen bg-[#F8FAFC] font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-900">
       
-      {/* MOBILE HEADER */}
-      <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-[100]">
-        <Link to="/" className="text-xl font-black text-blue-600 tracking-tighter cursor-pointer">NextGen.</Link>
-        <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-2 text-slate-600 text-2xl cursor-pointer">{isSidebarOpen ? '✕' : '☰'}</button>
-      </div>
+      {/* 📱 MOBILE HEADER - Hidden when sidebar is open */}
+      {!isSidebarOpen && (
+        <div className="lg:hidden flex items-center justify-between p-4 bg-white border-b border-slate-200 z-[50] sticky top-0 animate-in fade-in duration-300">
+          <Link to="/" className="text-xl font-black text-blue-600 tracking-tighter">NextGen.</Link>
+          <button 
+            onClick={() => setIsSidebarOpen(true)} 
+            className="p-2 text-slate-600 text-2xl cursor-pointer"
+          >
+            ☰
+          </button>
+        </div>
+      )}
 
-      {/* SIDEBAR */}
-      <div className={`fixed inset-y-0 left-0 w-72 bg-white border-r border-slate-200 flex flex-col p-8 z-40 transform transition-transform duration-300 lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
-        <Link to="/" className="hidden lg:block text-2xl font-black text-blue-600 mb-12 tracking-tighter cursor-pointer">NextGen.</Link>
-<nav className="space-y-3 flex-1">
+      {/* 🌫️ MOBILE OVERLAY - Handles "Touch Outside to Close" */}
+      {isSidebarOpen && (
+        <div 
+          onClick={() => setIsSidebarOpen(false)} 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-[110] lg:hidden transition-opacity animate-in fade-in duration-300" 
+        />
+      )}
+
+      {/* 🧭 SIDEBAR - Now at the absolute front (z-[120]) */}
+      <div className={`
+        fixed inset-y-0 left-0 w-[85%] sm:w-80 bg-white shadow-2xl flex flex-col z-[120] 
+        transform transition-transform duration-500 ease-out lg:relative lg:translate-x-0 lg:w-72 lg:shadow-none lg:border-r lg:border-slate-200
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        
+        {/* Sidebar Header with Close Button (Front and Center) */}
+        <div className="flex items-center justify-between p-8 pb-4">
+          <Link to="/" className="text-2xl font-black text-blue-600 tracking-tighter">NextGen.</Link>
+          <button 
+            onClick={() => setIsSidebarOpen(false)}
+            className="lg:hidden p-2 text-slate-400 hover:text-slate-900 transition-colors text-2xl cursor-pointer"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Navigation Menu */}
+        <nav className="flex-1 px-6 pt-4 space-y-2 overflow-y-auto">
           {[
-            { id: 'overview', label: 'Dashboard Overview' },
-            { id: 'courses', label: 'Course Management' },
-            { id: 'progress', label: 'Student Progress' }
+            { id: 'overview', label: 'Dashboard Overview', icon: '📊' },
+            { id: 'courses', label: 'Course Management', icon: '📚' },
+            { id: 'progress', label: 'Student Progress', icon: '📈' }
           ].map((item) => (
             <button 
               key={item.id} 
               onClick={() => { 
                 setActiveTab(item.id); 
-                // Only reset to list if moving to a different category
                 if (activeTab !== 'courses') setCourseViewMode('list'); 
                 setIsSidebarOpen(false); 
               }} 
-              className={`w-full flex items-center gap-3 p-4 rounded-2xl font-bold text-sm transition-all capitalize cursor-pointer ${activeTab === item.id ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-4 p-5 rounded-[1.5rem] font-bold text-sm transition-all cursor-pointer ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-[1.02]' : 'text-slate-400 hover:bg-slate-50'}`}
             >
+              <span className="text-xl">{item.icon}</span>
               {item.label}
             </button>
           ))}
         </nav>
-        <div className="p-5 bg-slate-900 rounded-[2rem] text-white mt-auto">
-          <p className="text-[9px] font-black text-blue-400 uppercase mb-1">Instructor</p>
-          <p className="text-sm font-bold truncate">{user?.name}</p>
-          <button onClick={() => { localStorage.clear(); navigate('/login'); }} className="mt-2 text-[10px] text-slate-400 hover:text-red-400 font-bold uppercase tracking-wider cursor-pointer">Sign Out</button>
+
+        {/* Bottom Instructor Card */}
+        <div className="p-6 mt-auto">
+          <div className="p-6 bg-slate-900 rounded-[2.5rem] text-white shadow-xl">
+            <p className="text-[10px] font-black text-blue-400 uppercase mb-1 tracking-widest">Instructor Access</p>
+            <p className="text-base font-bold truncate">{user?.name}</p>
+            <button 
+              onClick={() => { localStorage.clear(); navigate('/login'); }} 
+              className="mt-4 w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border border-red-500/20"
+            >
+              Sign Out Securely
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* OVERLAY FOR MOBILE SIDEBAR */}
-      {isSidebarOpen && (
-        <div onClick={() => setIsSidebarOpen(false)} className="fixed inset-0 bg-black/20 backdrop-blur-sm z-[80] lg:hidden cursor-pointer" />
-      )}
-
-      <div className="flex-1 overflow-y-auto bg-slate-50/30">
+      {/* 🖥️ MAIN CONTENT AREA */}
+      <div className="flex-1 overflow-y-auto bg-slate-50/30 flex flex-col">
         <div className="bg-white/80 backdrop-blur-md px-6 lg:px-10 py-6 border-b border-slate-100 sticky top-0 z-20 flex justify-between items-center">
           <h2 className="text-lg lg:text-xl font-extrabold text-slate-900 capitalize">
             {courseViewMode === 'list' ? activeTab : (courseViewMode === 'edit' ? 'Edit Course' : 'Create Course')}
@@ -540,61 +576,109 @@ if (item.type === 'video') {
           )}
 
           {/* STUDENT PROGRESS TAB */}
-          {activeTab === 'progress' && (
-            <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden animate-in slide-in-from-bottom-4 duration-500 relative">
-              <div className="p-6 border-b border-slate-50 flex justify-between items-center relative z-[30]">
-                <h3 className="font-black text-slate-900 text-lg">Student Performance Tracking</h3>
-                <button 
-                  onClick={() => { fetchDashboardData(); toast.success("Refreshed"); }} 
-                  className="bg-blue-50 text-blue-600 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all cursor-pointer z-[40]"
-                >
-                  {loadingStats ? "Syncing..." : "Refresh Data"}
-                </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="bg-slate-50/50 text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                      <th className="px-8 py-4">Student</th>
-                      <th className="px-8 py-4">Course</th>
-                      <th className="px-8 py-4">Progress</th>
-                      <th className="px-8 py-4">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50">
-                    {studentProgress.length > 0 ? studentProgress.map((student, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="px-8 py-5">
-                          <p className="font-bold text-slate-900 text-sm">{student.name}</p>
-                          <p className="text-[10px] text-slate-400">{student.email}</p>
-                        </td>
-                        <td className="px-8 py-5">
-                          <span className="text-xs font-bold text-slate-600">{student.courseTitle}</span>
-                        </td>
-                        <td className="px-8 py-5">
-                          <div className="flex items-center gap-3">
-                            <div className="flex-1 h-1.5 bg-slate-100 rounded-full w-24">
-                              <div className="h-full bg-blue-600 rounded-full transition-all duration-1000" style={{ width: `${student.progress}%` }}></div>
-                            </div>
-                            <span className="text-[10px] font-black text-slate-900">{student.progress}%</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-5">
-                          <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${student.progress === 100 ? 'bg-green-100 text-green-600' : 'bg-amber-100 text-amber-600'}`}>
-                            {student.progress === 100 ? 'Completed' : 'In Progress'}
-                          </span>
-                        </td>
-                      </tr>
-                    )) : (
-                      <tr>
-                        <td colSpan="4" className="px-8 py-20 text-center text-slate-400 font-medium">No student data available yet.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
+{/* STUDENT PROGRESS TAB - Desktop Optimized & Mobile Responsive */}
+{activeTab === 'progress' && (
+  <div className="space-y-6 animate-in slide-in-from-bottom-4 duration-700">
+    
+    {/* Header Card */}
+<div className="flex flex-col md:flex-row justify-between items-center gap-6">
+  <div className="text-center md:text-left">
+    <h3 className="font-black text-slate-900 text-xl lg:text-2xl">Learning Analytics</h3>
+    {/* 🔥 Subtle auto-refresh indicator */}
+    <div className="flex items-center gap-2 mt-1 justify-center md:justify-start">
+      <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></div>
+      <p className="text-slate-400 text-xs font-medium">Auto-syncing every 30s</p>
+    </div>
+  </div>
+
+  <button 
+    onClick={() => { fetchDashboardData(); toast.success("Manual Sync Complete"); }} 
+    disabled={loadingStats}
+    className="group flex items-center gap-2 px-5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-600 text-[10px] font-black uppercase tracking-widest hover:bg-slate-50 hover:border-blue-300 hover:text-blue-600 transition-all cursor-pointer shadow-sm"
+  >
+    {loadingStats ? (
+      <div className="w-3 h-3 border-2 border-blue-600/30 border-t-blue-600 rounded-full animate-spin"></div>
+    ) : (
+      <svg className="w-3 h-3 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+      </svg>
+    )}
+    Sync Now
+  </button>
+</div>
+
+    {/* Table Container - Uses min-w-full to expand on desktop */}
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
+      <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-slate-50/50 border-b border-slate-100">
+              <th className="px-8 py-6 text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Student Identity</th>
+              <th className="px-8 py-6 text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Active Course</th>
+              <th className="px-8 py-6 text-[11px] font-black uppercase text-slate-400 tracking-[0.2em]">Current Progress</th>
+              <th className="px-8 py-6 text-[11px] font-black uppercase text-slate-400 tracking-[0.2em] text-center">Status</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {studentProgress.length > 0 ? studentProgress.map((student, idx) => (
+              <tr key={idx} className="hover:bg-blue-50/30 transition-all group">
+                <td className="px-8 py-8">
+                  <div className="flex items-center gap-4">
+                    <div className="w-10 h-10 lg:w-12 lg:h-12 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-400 flex items-center justify-center text-white font-black text-sm lg:text-base shadow-md">
+                      {student.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="font-bold text-slate-900 text-sm lg:text-base group-hover:text-blue-600 transition-colors">{student.name}</p>
+                      <p className="text-[11px] text-slate-400 font-medium">{student.email}</p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-8 py-8">
+                  <span className="text-xs lg:text-sm font-bold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">
+                    {student.courseTitle}
+                  </span>
+                </td>
+                <td className="px-8 py-8">
+                  <div className="flex flex-col gap-2 min-w-[150px] lg:min-w-[250px]">
+                    <div className="flex justify-between text-[10px] font-black text-blue-600 uppercase">
+                      <span>Completion</span>
+                      <span>{student.progress}%</span>
+                    </div>
+                    <div className="w-full h-2.5 bg-slate-100 rounded-full overflow-hidden shadow-inner">
+                      <div 
+                        className="h-full bg-blue-600 rounded-full transition-all duration-1000 ease-out shadow-[0_0_10px_rgba(37,99,235,0.4)]" 
+                        style={{ width: `${student.progress}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-8 py-8 text-center">
+                  <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border ${
+                    student.progress === 100 
+                    ? 'bg-green-50 text-green-600 border-green-100 shadow-sm shadow-green-100' 
+                    : 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-100'
+                  }`}>
+                    <div className={`w-2 h-2 rounded-full ${student.progress === 100 ? 'bg-green-500' : 'bg-amber-500 animate-pulse'}`}></div>
+                    {student.progress === 100 ? 'Certified' : 'Learning'}
+                  </span>
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan="4" className="px-8 py-32 text-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <span className="text-4xl grayscale opacity-30">📂</span>
+                    <p className="text-slate-400 font-bold text-sm">No student activity detected yet.</p>
+                  </div>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
 
           {activeTab === 'courses' && (
             <>

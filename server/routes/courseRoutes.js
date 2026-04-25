@@ -49,8 +49,17 @@ const extractPdfText = async (buffer) => {
 
 // --- STATIC ROUTES (MUST BE ABOVE /:id) ---
 
+// 3. Stats & Popular
+router.get('/public-stats', getPublicStats);
+router.get('/popular', async (req, res) => {
+  try {
+    const popular = await Course.find().sort({ enrolledCount: -1 }).limit(3);
+    res.json(popular);
+  } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
 // 1. All Courses
-router.get('/all', validate(getAllCoursesSchema), async (req, res) => {
+router.get('/all', authMiddleware, validate(getAllCoursesSchema), async (req, res) => {
   try {
     /**
      * 🔥 PERFORMANCE OPTIMIZATIONS:
@@ -72,6 +81,8 @@ router.get('/all', validate(getAllCoursesSchema), async (req, res) => {
   }
 });
 
+
+
 // 2. Instructor Dashboard Data (THE FIX FOR 400 ERROR)
 router.get('/instructor-courses', authMiddleware, async (req, res) => {
   try {
@@ -91,14 +102,6 @@ router.get('/instructor-courses', authMiddleware, async (req, res) => {
   }
 });
 
-// 3. Stats & Popular
-router.get('/public-stats', getPublicStats);
-router.get('/popular', async (req, res) => {
-  try {
-    const popular = await Course.find().sort({ enrolledCount: -1 }).limit(3);
-    res.json(popular);
-  } catch (error) { res.status(500).json({ error: error.message }); }
-});
 
 // 4. AI Recommendations
 router.get('/recommendations/:userId', validate(recommendationSchema), async (req, res) => {
@@ -169,6 +172,19 @@ router.post('/create', authMiddleware, upload.fields([{ name: 'image' }, { name:
     });
     res.status(201).json(saved);
   } catch (error) { res.status(500).json({ error: error.message }); }
+});
+
+router.get('/:id', authMiddleware, async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id)
+      .populate('instructor', 'name profilePicture')
+      .lean(); // We want modules and description here!
+
+    if (!course) return res.status(404).json({ error: "Course not found" });
+    res.json(course);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // 6. Update Course

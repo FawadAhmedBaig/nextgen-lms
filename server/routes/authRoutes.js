@@ -179,49 +179,68 @@ router.post('/login', validate(loginSchema), async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    const user = await User.findOne({ email });
+    // 1. Find User
+    const user = await User.findOne({ email: email.toLowerCase() });
     if (!user) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
-    // Check if account is blocked by admin
-    if (user.status === 'blocked') {
-        return res.status(403).json({ message: "Your account has been blocked by the Administrator." });
-    }
-
-    // Inside router.post('/login', ...)
-    if (user.role === 'instructor' && user.status === 'pending') {
-        return res.status(403).json({ message: "Account pending admin approval." });
-    }
-
-    if (user.role === 'instructor' && !user.isApproved) {
+    // 2. Verification Gatekeeper
+    if (!user.isVerified) {
       return res.status(403).json({ 
-        message: "Your instructor account is currently pending approval. Please check back later." 
+        message: "Your email is not verified. Please verify your account to log in.",
+        needsVerification: true 
       });
     }
 
+    // 3. Blocked Status Check
+    if (user.status === 'blocked') {
+      return res.status(403).json({ message: "Your account has been blocked by the Administrator." });
+    }
+
+    // 4. Instructor Approval Logic (The Shahzad/Saleem Fix)
+    if (user.role === 'instructor') {
+      // 💡 FLEXIBLE CHECK: Allow login if status is active OR isApproved is true.
+      // This prevents instructors from getting stuck if the Admin only toggled one field.
+      const isReady = user.status === 'active' || user.isApproved === true;
+      
+      if (!isReady) {
+        return res.status(403).json({ 
+          message: "Your instructor account is currently pending approval. Please check back later." 
+        });
+      }
+    }
+
+    // 5. Password Verification
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
 
+    // 6. Generate JWT Token
     const token = jwt.sign(
       { id: user._id, role: user.role }, 
       process.env.JWT_SECRET, 
       { expiresIn: '30d' }
     );
 
+    // 7. Final Response
     res.json({
       token,
       user: {
         id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        status: user.status,
+        isVerified: user.isVerified,
+        profilePicture: user.profilePicture
       }
     });
+
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error("❌ LOGIN ROUTE ERROR:", err);
+    res.status(500).json({ error: "Internal Server Error", details: err.message });
   }
 });
 
@@ -302,8 +321,6 @@ router.post('/google-login', async (req, res) => {
     // 2. If user doesn't exist, create them
     if (!user) {
       const userRole = role || 'student';
-      
-      // logic: Instructors start as 'pending', Students start as 'active'
       const isInstructor = userRole === 'instructor';
       
       user = new User({
@@ -312,24 +329,36 @@ router.post('/google-login', async (req, res) => {
         profilePicture: avatar || "",
         role: userRole,
         status: isInstructor ? 'pending' : 'active',
-        isApproved: isInstructor ? false : true, // 🔥 Key Fix: Sync this with role
+        isApproved: isInstructor ? false : true,
+        // 🔥 THE FIX: Mark Google users as verified immediately
+        isVerified: true 
       });
 
       await user.save();
-      console.log(`✅ New Google User Created: ${user.email} as ${user.role}`);
+      console.log(`✅ New Google User Created: ${user.email} (Verified)`);
+    } else {
+      if (avatar && user.profilePicture !== avatar) {
+        user.profilePicture = avatar;
+        await user.save();
+      }
+      // 🔥 SYNC CHECK: If user exists but isVerified is false, update it now
+      // This handles users created before the schema update.
+      if (user.isVerified === false) {
+        user.isVerified = true;
+        await user.save();
+      }
     }
 
-    // 3. Status Gatekeeper (The unified check)
+    // 3. Status Gatekeeper
     if (user.status === 'blocked') {
       return res.status(403).json({ message: "This account has been blocked by administrator." });
     }
 
-    // 🔥 FIX: If the role is instructor, they MUST have status 'active' OR isApproved 'true'
-    // This allows the admin to update EITHER field and still let the user in.
+    // Instructor Approval Gatekeeper
     if (user.role === 'instructor') {
-       const verified = user.isApproved === true || user.status === 'active';
+       const verifiedAndApproved = user.isApproved === true || user.status === 'active';
        
-       if (!verified) {
+       if (!verifiedAndApproved) {
          return res.status(403).json({ 
            message: "Your instructor account is currently pending approval. Please check back later." 
          });
@@ -352,20 +381,13 @@ router.post('/google-login', async (req, res) => {
         email: user.email,
         role: user.role,
         status: user.status,
+        isVerified: user.isVerified, // Include in response
         profilePicture: user.profilePicture
       }
     });
 
   } catch (err) {
     console.error("❌ GOOGLE LOGIN BACKEND ERROR:", err);
-    
-    if (err.code === 11000) {
-      return res.status(500).json({ 
-        error: "Database Conflict", 
-        message: "A database index conflict occurred. Please ensure your user data is clean." 
-      });
-    }
-
     res.status(500).json({ error: "Internal Server Error", details: err.message });
   }
 });

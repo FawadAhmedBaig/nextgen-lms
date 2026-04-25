@@ -14,24 +14,30 @@ const CourseCard = ({ course, isRecommended = false, enrolledCourseIds, onViewDe
     >
 <div className="relative h-48 overflow-hidden bg-slate-100">
   <img 
-    // 🔥 Optimization: Resize image to 600px width and auto-format for speed
     src={course.imageUrl?.replace('/upload/', '/upload/w_600,c_fill,g_auto,f_auto,q_auto/')} 
     alt={course.title} 
-    // 🔥 Lazy Load: Browser only downloads this when it's close to appearing
     loading="lazy" 
     className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
   />
   
-  <div className="absolute top-4 left-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-blue-600">
-    {course.category}
-  </div>
-
-  {isRecommended && (
-    <div className="absolute top-4 right-4 bg-blue-600 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-white shadow-lg flex items-center gap-1.5">
-      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M11 3V1L8 11h2v8l4-11h-2l3-7h-3z" /></svg>
-      AI Recommended
+  {/* 🔥 Top Bar Container: Uses flex to prevent overlap */}
+  <div className="absolute top-3 left-3 right-3 flex flex-wrap gap-2 items-start pointer-events-none">
+    
+    {/* Category Label */}
+    <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest text-blue-600 shadow-sm border border-white/20">
+      {course.category}
     </div>
-  )}
+
+    {/* AI Recommended Label */}
+    {isRecommended && (
+      <div className="bg-blue-600 px-2 py-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white shadow-lg flex items-center gap-1">
+        <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M11 3V1L8 11h2v8l4-11h-2l3-7h-3z" />
+        </svg>
+        <span>AI Recommended</span>
+      </div>
+    )}
+  </div>
 </div>
       
       <div className="p-6 md:p-8">
@@ -109,63 +115,92 @@ const Courses = () => {
   const [hasReachedThreshold, setHasReachedThreshold] = useState(false);
 
 useEffect(() => {
-const fetchData = async () => {
-  setLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    const userStr = localStorage.getItem('user');
-    const user = (token && userStr && userStr !== "undefined") ? JSON.parse(userStr) : null;
-    const userId = user?._id || user?.id;
+  const fetchData = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const userStr = localStorage.getItem('user');
+      const user = (token && userStr && userStr !== "undefined") ? JSON.parse(userStr) : null;
+      const userId = user?._id || user?.id;
 
-    // 🔥 PARALLEL FETCHING: Fetch courses and enrollments at the same time
-    const [coursesRes, enrollRes] = await Promise.all([
-      API.get('/courses/all'),
-      userId ? API.get('/enrollments/my-enrollments').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
-    ]);
+      // 🔥 PARALLEL FETCHING: Courses and Enrollments
+      const [coursesRes, enrollRes] = await Promise.all([
+        API.get('/courses/all'),
+        userId ? API.get('/enrollments/my-enrollments').catch(() => ({ data: [] })) : Promise.resolve({ data: [] })
+      ]);
 
-    // 1. Process Courses with Randomization
-    if (coursesRes.data && Array.isArray(coursesRes.data)) {
-      let allCourses = [...coursesRes.data];
-      
-      // 🎲 Fisher-Yates Shuffle for Random Order
-      for (let i = allCourses.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [allCourses[i], allCourses[j]] = [allCourses[j], allCourses[i]];
+      // 1. Process Courses with Randomization
+      let allCourses = [];
+      if (coursesRes.data && Array.isArray(coursesRes.data)) {
+        allCourses = [...coursesRes.data];
+        for (let i = allCourses.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allCourses[i], allCourses[j]] = [allCourses[j], allCourses[i]];
+        }
+        setCourses(allCourses);
       }
-      setCourses(allCourses);
+
+      // 2. Process Enrollment Data
+      const enrollmentData = enrollRes.data || [];
+      const enrolledSet = new Set(enrollmentData.map(e => e.course?._id).filter(id => id));
+      setEnrolledCourseIds(enrolledSet);
+      
+      const finishedIds = enrollmentData
+        .filter(e => e.isCompleted === true || e.progress === 100)
+        .map(e => e.course?._id)
+        .filter(id => id);
+      setCompletedCourseIds(new Set(finishedIds));
+
+      // 3. 🔥 SMART AI RECOMMENDATIONS (The Refill Logic)
+      const meetsThreshold = enrollmentData.some(e => e.progress >= 50);
+      setHasReachedThreshold(meetsThreshold);
+
+      if (meetsThreshold && userId && allCourses.length > 0) {
+        try {
+          const recRes = await API.get(`/courses/recommendations/${userId}`);
+          let aiRecs = recRes.data || [];
+
+          // Step A: Filter out already enrolled courses from AI results
+          let finalDisplayList = aiRecs.filter(c => !enrolledSet.has(c._id));
+
+          // Step B: REFILL if less than 3 (using same categories)
+          if (finalDisplayList.length < 3) {
+            const preferredCats = [...new Set(aiRecs.map(c => c.category))];
+            
+            const refillCourses = allCourses.filter(c => 
+              !enrolledSet.has(c._id) && 
+              !finalDisplayList.find(f => f._id === c._id) &&
+              preferredCats.includes(c.category)
+            );
+
+            finalDisplayList = [...finalDisplayList, ...refillCourses].slice(0, 3);
+          }
+
+          // Step C: EMERGENCY BACKFILL (If still < 3, take any non-enrolled course)
+          if (finalDisplayList.length < 3) {
+            const emergencyBackfill = allCourses.filter(c => 
+              !enrolledSet.has(c._id) && 
+              !finalDisplayList.find(f => f._id === c._id)
+            );
+            finalDisplayList = [...finalDisplayList, ...emergencyBackfill].slice(0, 3);
+          }
+
+          setRecommendedCourses(finalDisplayList);
+        } catch (recErr) {
+          console.error("AI Rec fetch failed", recErr);
+        }
+      }
+
+    } catch (err) {
+      console.error("❌ Critical Fetch Error:", err);
+      toast.error("Failed to load workspace data.");
+    } finally {
+      setLoading(false);
     }
-
-    // 2. Process Enrollment Data
-    const enrollmentData = enrollRes.data || [];
-    setEnrolledCourseIds(new Set(enrollmentData.map(e => e.course?._id).filter(id => id)));
-    
-    const finishedIds = enrollmentData
-      .filter(e => e.isCompleted === true || e.progress === 100)
-      .map(e => e.course?._id)
-      .filter(id => id);
-    setCompletedCourseIds(new Set(finishedIds));
-
-    // 3. Handle Recommendations (Post-processing)
-    const meetsThreshold = enrollmentData.some(e => e.progress >= 50);
-    setHasReachedThreshold(meetsThreshold);
-
-    if (meetsThreshold && userId) {
-      // We do this separately as it depends on enrollment threshold
-      const recRes = await API.get(`/courses/recommendations/${userId}`).catch(() => ({ data: [] }));
-      setRecommendedCourses(recRes.data || []);
-    }
-
-  } catch (err) {
-    console.error("❌ Critical Fetch Error:", err);
-    toast.error("Failed to load workspace data.");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
   fetchData();
-}, []); // Empty dependency array is correct here
-
+}, []);
   // 🔥 NAV LOGIC: Unified handler for card/button clicks
   const handleCourseClick = (course) => {
     if (enrolledCourseIds.has(course._id)) {
@@ -251,48 +286,58 @@ const filteredCourses = courses.filter(course => {
 )}
 
 {/* Filters Section */}
-<div className="flex flex-col gap-6 mb-8 md:mb-10">
-  {/* Category Filter */}
-  <div className="flex items-center gap-3 overflow-x-auto pb-2 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
-    {categories.map((cat) => (
-      <button 
-        key={cat} 
-        onClick={() => setActiveCategory(cat)} 
-        className={`whitespace-nowrap px-5 md:px-6 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold transition-all border cursor-pointer ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}
-      >
-        {cat}
-      </button>
-    ))}
+<div className="flex flex-col gap-8 mb-8 md:mb-10">
+  
+  {/* 1. Category Filter: Horizontal Scrollable on Mobile */}
+  <div className="w-full">
+    <div className="flex items-center gap-3 overflow-x-auto pb-4 scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0 md:flex-wrap">
+      {categories.map((cat) => (
+        <button 
+          key={cat} 
+          onClick={() => setActiveCategory(cat)} 
+          className={`whitespace-nowrap px-5 md:px-6 py-2 md:py-2.5 rounded-full text-xs md:text-sm font-bold transition-all border cursor-pointer shrink-0 ${activeCategory === cat ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-100' : 'bg-white text-slate-600 border-slate-200 hover:border-blue-400'}`}
+        >
+          {cat}
+        </button>
+      ))}
+    </div>
   </div>
 
-  <div className="flex flex-wrap items-center gap-6">
-    {/* Price Filter */}
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Price:</span>
-      {priceOptions.map((opt) => (
-        <button 
-          key={opt} 
-          onClick={() => setPriceFilter(opt)} 
-          className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border cursor-pointer ${priceFilter === opt ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-        >
-          {opt}
-        </button>
-      ))}
+  {/* 2. Secondary Filters: Stack on mobile, side-by-side on desktop */}
+  <div className="flex flex-col md:flex-row md:items-center gap-6 md:gap-10">
+    
+    {/* Price Filter Group */}
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Price Range:</span>
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {priceOptions.map((opt) => (
+          <button 
+            key={opt} 
+            onClick={() => setPriceFilter(opt)} 
+            className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border cursor-pointer shrink-0 ${priceFilter === opt ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+          >
+            {opt}
+          </button>
+        ))}
+      </div>
     </div>
 
-    {/* 🔥 NEW: Difficulty Filter */}
-    <div className="flex items-center gap-3">
-      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-2">Difficulty:</span>
-      {difficultyLevels.map((level) => (
-        <button 
-          key={level} 
-          onClick={() => setLevelFilter(level)} 
-          className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border cursor-pointer ${levelFilter === level ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
-        >
-          {level}
-        </button>
-      ))}
+    {/* Difficulty Filter Group - Now Scrollable and Wrapped for Small Screens */}
+    <div className="flex flex-col gap-2">
+      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Expertise Level:</span>
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-hide">
+        {difficultyLevels.map((level) => (
+          <button 
+            key={level} 
+            onClick={() => setLevelFilter(level)} 
+            className={`whitespace-nowrap px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border cursor-pointer shrink-0 ${levelFilter === level ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-slate-500 border-slate-200 hover:border-slate-50'}`}
+          >
+            {level}
+          </button>
+        ))}
+      </div>
     </div>
+
   </div>
 </div>
 

@@ -6,35 +6,43 @@ import AiTutor from '../components/AiTutor';
 import { useSearchParams } from 'react-router-dom';
 
 // --- SUB-COMPONENT FOR VIDEO TO PREVENT DOM CONFLICTS ---
+// --- SUB-COMPONENT FOR VIDEO WITH AUTO-PLAY ---
 const VideoPlayer = ({ videoUrl, onComplete }) => {
   const containerRef = useRef(null);
   const playerRef = useRef(null);
 
   useEffect(() => {
-let videoId = "";
-const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-const match = videoUrl.match(regExp);
-if (match && match[2].length === 11) {
-  videoId = match[2];
-} else {
-  videoId = videoUrl; // Fallback
-}
+    let videoId = "";
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+    const match = videoUrl.match(regExp);
+    if (match && match[2].length === 11) {
+      videoId = match[2];
+    } else {
+      videoId = videoUrl; 
+    }
 
     const initPlayer = () => {
       if (playerRef.current) {
         playerRef.current.destroy();
       }
-      playerRef.current = new window.YT.Player(containerRef.current, {
-        height: '100%',
-        width: '100%',
-        videoId: videoId,
-        playerVars: { 
-            rel: 0, 
-            modestbranding: 1, 
-            iv_load_policy: 3,
-            autoplay: 1 
-        },
+playerRef.current = new window.YT.Player(containerRef.current, {
+  height: '100%',
+  width: '100%',
+  videoId: videoId,
+  playerVars: { 
+      autoplay: 1,
+      controls: 1,          // Show basic controls (play/pause, volume, etc.)
+      rel: 0,               // Don't show related videos from other channels
+      modestbranding: 1,    // Hides the YouTube logo in the control bar
+      iv_load_policy: 3,    // Hide video annotations
+      disablekb: 1,         // Optional: Disable keyboard shortcuts
+      showinfo: 0           // Deprecated, but some older players still respect it
+  },
         events: {
+          'onReady': (event) => {
+            // 🔥 This is the secret sauce: Force play when the API is ready
+            event.target.playVideo();
+          },
           'onStateChange': (event) => {
             if (event.data === window.YT.PlayerState.ENDED) onComplete();
           }
@@ -148,33 +156,75 @@ const getEmbedLink = (url) => {
   };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const storedUser = JSON.parse(localStorage.getItem('user'));
-        setUser(storedUser);
-        const res = await API.get(`/courses/all`);
-        const currentCourse = res.data.find(c => c._id === id);
-        if (currentCourse) setCourse(currentCourse);
-        else return navigate('/courses');
+const fetchData = async () => {
+  setLoading(true); // Ensure loading starts as true
+  try {
+    const userStr = localStorage.getItem('user');
+    const token = localStorage.getItem('token');
 
-        try {
-          const progRes = await API.get(`/users/course-progress/${id}`);
-          if (progRes.data) {
-            setCompletedLessons(progRes.data.completedLessons || []);
-            if (progRes.data.isCompleted) setQuizResult({ score: 100, passed: true });
-          }
-        } catch (e) { console.log("New enrollment."); }
+    // 1. Basic Auth Check
+    if (!userStr || userStr === "undefined" || !token) {
+      toast.error("Session missing. Please login.");
+      return navigate('/login');
+    }
 
-        try {
-          const quizRes = await API.get(`/quizzes/course/${id}`);
-          setQuiz(quizRes.data);
-        } catch (qErr) { console.error("Final Quiz missing"); }
-      } catch (err) {
-        toast.error("Initialization failed");
-      } finally {
-        setLoading(false);
+    const storedUser = JSON.parse(userStr);
+    setUser(storedUser);
+
+    console.log(`📡 Fetching Workspace for Course ID: ${id}`);
+
+    // 2. Fetch Course Data
+    // We fetch the course and user progress in parallel to save time
+    const [courseRes, progressRes] = await Promise.allSettled([
+      API.get(`/courses/${id}`),
+      API.get(`/users/course-progress/${id}`)
+    ]);
+
+    // 3. Handle Course Result
+    if (courseRes.status === 'fulfilled') {
+      setCourse(courseRes.value.data);
+    } else {
+      // If course fetch fails, we MUST stop the loading hang
+      console.error("❌ Course Fetch Failed:", courseRes.reason);
+      const status = courseRes.reason.response?.status;
+      
+      if (status === 401) {
+        toast.error("Session expired. Please re-login.");
+        localStorage.clear();
+        return navigate('/login');
+      } else if (status === 404) {
+        toast.error("Course not found.");
+        return navigate('/courses');
+      } else {
+        throw new Error(courseRes.reason.response?.data?.error || "Network Error");
       }
-    };
+    }
+
+    // 4. Handle Progress Result
+    if (progressRes.status === 'fulfilled' && progressRes.value.data) {
+      setCompletedLessons(progressRes.value.data.completedLessons || []);
+      if (progressRes.value.data.isCompleted) {
+        setQuizResult({ score: 100, passed: true });
+      }
+    }
+
+    // 5. Fetch Final Quiz
+    try {
+      const quizRes = await API.get(`/quizzes/course/${id}`);
+      setQuiz(quizRes.data);
+    } catch (qErr) {
+      console.warn("⚠️ Final Quiz not found for this course.");
+    }
+
+  } catch (err) {
+    console.error("🔥 CRITICAL WORKSPACE ERROR:", err);
+    toast.error(err.message || "Failed to initialize workspace.");
+    // If we can't get the course, we can't stay here
+    setTimeout(() => navigate('/courses'), 3000);
+  } finally {
+    setLoading(false);
+  }
+};
     if (!window.YT) {
       const tag = document.createElement('script');
       tag.src = "https://www.youtube.com/iframe_api";
@@ -324,7 +374,7 @@ const downloadCertificate = async () => {
   const isCourseComplete = progressPercentage === 100;
 
   if (loading || !course) return <div className="h-screen flex items-center justify-center font-black text-slate-300 animate-pulse">Initializing Workspace...</div>;
-
+  
   return (
     <div className="flex flex-col lg:flex-row h-screen bg-white font-['Plus_Jakarta_Sans'] overflow-hidden text-slate-900">
       
@@ -411,6 +461,7 @@ const downloadCertificate = async () => {
       </div>
 
       {/* MAINFRAME */}
+{/* MAINFRAME */}
       <div className="flex-1 overflow-y-auto bg-slate-50/50 flex flex-col relative z-10">
         <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md px-4 sm:px-10 py-5 border-b border-slate-100 flex flex-wrap justify-between items-center gap-4">
           <div className="flex items-center gap-3 min-w-0">
@@ -431,27 +482,24 @@ const downloadCertificate = async () => {
           </div>
         </div>
 
-        <div className="p-2 sm:p-8 max-w-5xl mx-auto w-full flex-1 flex flex-col">
-          {/* RESPONSIVE CONTENT CONTAINER */}
+<div className="p-2 sm:p-8 max-w-5xl mx-auto w-full flex-1 flex flex-col">
           <div className="w-full relative bg-black rounded-2xl lg:rounded-[2.5rem] shadow-2xl overflow-hidden mb-6 sm:mb-10 border-2 sm:border-8 border-white flex flex-col min-h-[450px] lg:min-h-[550px]">
-{currentItem?.type === 'video' ? (
-  <iframe
-    key={currentItem.contentUrl}
-    src={getEmbedLink(currentItem.contentUrl)}
-    className="w-full flex-1 min-h-[450px] lg:min-h-[550px] border-none"
-    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-    allowFullScreen
-    title="course-video"
-  ></iframe>
-) : currentItem?.type === 'pdf' ? (
-   <iframe 
-     key={currentItem.contentUrl} // Forces iframe to refresh on lesson change
-     src={getEmbedLink(currentItem.contentUrl)} 
-     className="w-full flex-1 min-h-[500px] lg:min-h-[600px] border-none bg-white" 
-     allowFullScreen
-     title="pdf-viewer" 
-   />
-) : currentItem?.type === 'quiz' ? (
+            {/* 🔥 UPDATED CONTENT RENDERER */}
+            {currentItem?.type === 'video' ? (
+              <VideoPlayer 
+                key={currentItem.contentUrl} 
+                videoUrl={currentItem.contentUrl} 
+                onComplete={handleAutoProgress} 
+              />
+            ) : currentItem?.type === 'pdf' ? (
+               <iframe 
+                 key={currentItem.contentUrl} 
+                 src={getEmbedLink(currentItem.contentUrl)} 
+                 className="w-full flex-1 min-h-[500px] lg:min-h-[600px] border-none bg-white" 
+                 allowFullScreen
+                 title="pdf-viewer" 
+               />
+            ) : currentItem?.type === 'quiz' ? (
   <div className="w-full flex-1 bg-[#0F172A] p-4 sm:p-10 overflow-y-auto text-white flex flex-col text-left">
     <h3 className="text-lg sm:text-xl font-black mb-6 text-blue-400">Module Assessment</h3>
     

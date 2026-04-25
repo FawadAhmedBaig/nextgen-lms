@@ -41,11 +41,33 @@ export const issueBlockchainCert = async (studentId, courseId) => {
     const certHash = ethers.id(dataString); 
 
     console.log("📡 Sending Transaction to Polygon...");
-    const tx = await contract.issueCertificate(certHash, sId, cId, {
-      gasLimit: 250000,
-      maxPriorityFeePerGas: ethers.parseUnits('50', 'gwei'), 
-      maxFeePerGas: ethers.parseUnits('100', 'gwei')
-    });
+// 1. Fetch current gas fees from the provider
+const feeData = await provider.getFeeData();
+
+// 2. Calculate a "Speed Premium" (20-30% extra to jump the queue)
+// We use BigInt for precision in ethers v6
+const priorityFee = (feeData.maxPriorityFeePerGas * 130n) / 100n; 
+const maxFee = (feeData.maxFeePerGas * 150n) / 100n;
+
+const tx = await contract.issueCertificate(certHash, sId, cId, {
+  // Let the library estimate gasLimit automatically to avoid "Out of Gas"
+  // but we provide a 10% buffer for safety
+  gasLimit: 300000, 
+  
+  // 🔥 This is the "Lightning" part: Jump to the front of the block
+  maxPriorityFeePerGas: priorityFee > ethers.parseUnits('50', 'gwei') 
+                        ? priorityFee 
+                        : ethers.parseUnits('50', 'gwei'), 
+  
+  // This ensures the transaction doesn't fail if the base fee rises
+  maxFeePerGas: maxFee > ethers.parseUnits('150', 'gwei') 
+                ? maxFee 
+                : ethers.parseUnits('150', 'gwei')
+});
+
+// 3. Wait for 1 confirmation (Polygon is fast)
+const receipt = await tx.wait(1);
+console.log(`✅ Certificate Anchored! Block: ${receipt.blockNumber}`);
 
     
     
