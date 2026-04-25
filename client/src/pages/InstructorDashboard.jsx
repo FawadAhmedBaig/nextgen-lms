@@ -31,7 +31,7 @@ const InstructorDashboard = () => {
   const [newLiveSession, setNewLiveSession] = useState({ title: '', date: '', time: '', meetingLink: '' });
   const [existingLiveSessions, setExistingLiveSessions] = useState([]);
   const [editingSessionId, setEditingSessionId] = useState(null);
-
+  const [loadingCourses, setLoadingCourses] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('token');
 
@@ -98,8 +98,8 @@ const fetchDashboardData = async () => {
   }, [activeTab]);
 
 const fetchMyCourses = async () => {
+  setLoadingCourses(true); // 🔥 Start loading
   try {
-    // We add a timestamp to prevent browser caching
     const res = await API.get(`/courses/all?t=${Date.now()}`);
     
     const currentUserId = user?.id || user?._id;
@@ -108,23 +108,17 @@ const fetchMyCourses = async () => {
     const filtered = res.data.filter(course => {
       const instructorId = course.instructor?._id || course.instructor;
       const instructorName = course.instructor?.name || course.instructorName;
-
-      const isIdMatch = instructorId && currentUserId && (String(instructorId) === String(currentUserId));
-      const isNameMatch = instructorName && currentUserName && (instructorName === currentUserName);
-
-      return isIdMatch || isNameMatch;
+      return (instructorId && currentUserId && String(instructorId) === String(currentUserId)) || 
+             (instructorName && currentUserName && instructorName === currentUserName);
     });
 
-    // 🔥 THE FIX: Sort by updatedAt (Newest first)
-    // This ensures that either a NEWLY created course or a RECENTLY edited course jumps to the top.
-    const sorted = filtered.sort((a, b) => {
-      return new Date(b.updatedAt) - new Date(a.updatedAt);
-    });
-
+    const sorted = filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     setMyCourses(sorted);
   } catch (err) {
     console.error("Fetch courses error:", err);
     toast.error("Failed to load your courses");
+  } finally {
+    setLoadingCourses(false); // 🔥 Stop loading
   }
 };
 
@@ -227,22 +221,64 @@ const isYouTubeLink = (url) => {
     setCourseData({ ...courseData, modules: updatedModules });
   };
 
-  const handleEditClick = async (course) => {
-    setCourseData({
-      title: course.title, price: course.price, description: course.description,
-      category: course.category, duration: course.duration, level: course.level,
-      instructorName: user.name,
-      modules: (course.modules && course.modules.length > 0) ? course.modules 
-        : [{ name: 'Module 1', items: course.lessons ? course.lessons.map(l => ({ type: 'video', title: l.title, contentUrl: l.videoUrl })) : [] }]
-    });
-    setEditingCourseId(course._id);
-    setCourseViewMode('edit');
-    try {
-      const res = await API.get(`/courses/${course._id}/live-sessions`);
-      setExistingLiveSessions(res.data);
-    } catch (e) { console.log("No live sessions found."); }
-  };
+const handleEditClick = async (course) => {
+  const toastId = toast.loading("Loading curriculum details...");
+  
+  try {
+    // 🔥 FORCE FETCH the full course to ensure modules are present
+    const fullCourseRes = await API.get(`/courses/${course._id}`);
+    const fullCourse = fullCourseRes.data;
 
+    console.log("Full Course Data Received:", fullCourse); // Check your console!
+
+    // 1. Set ID and Mode
+    setEditingCourseId(fullCourse._id);
+    
+    // 2. Prepare Modules with a fallback
+    const modulesToSet = (fullCourse.modules && fullCourse.modules.length > 0) 
+      ? JSON.parse(JSON.stringify(fullCourse.modules)) 
+      : [{ name: 'Introduction', items: [] }];
+
+    // 3. Update Course Data State
+    setCourseData({
+      title: fullCourse.title || '',
+      price: fullCourse.price || '',
+      description: fullCourse.description || '',
+      category: fullCourse.category || 'Blockchain',
+      duration: fullCourse.duration || '',
+      level: fullCourse.level || 'Beginner',
+      instructorName: user?.name || '',
+      modules: modulesToSet
+    });
+
+    // 4. Switch View Mode AFTER data is set
+    setCourseViewMode('edit');
+
+    // 5. Fetch Quiz & Sessions
+    const [quizRes, sessionsRes] = await Promise.allSettled([
+      API.get(`/quizzes/course/${fullCourse._id}`),
+      API.get(`/courses/${fullCourse._id}/live-sessions`)
+    ]);
+
+    if (quizRes.status === 'fulfilled' && quizRes.value.data) {
+      setQuizData({
+        title: quizRes.value.data.title || 'Final Graded Quiz',
+        passingScore: quizRes.value.data.passingScore || 80,
+        questions: JSON.parse(JSON.stringify(quizRes.value.data.questions))
+      });
+    }
+
+    if (sessionsRes.status === 'fulfilled') {
+      setExistingLiveSessions(sessionsRes.value.data);
+    }
+
+    toast.success("Ready to edit", { id: toastId });
+
+  } catch (err) {
+    console.error("Edit load failed:", err);
+    toast.error("Failed to load full course data", { id: toastId });
+  }
+};
 const resetForm = () => {
   // 1. Reset Course Metadata
   setCourseData({
@@ -424,32 +460,48 @@ if (item.type === 'video') {
     setIsPublishing(false);
   }
 };
-  const handleAddLiveSession = async (courseId) => {
-    if (!newLiveSession.title.trim()) return toast.error("Enter session title");
-    if (!isValidUrl(newLiveSession.meetingLink)) return toast.error("Please enter a valid Meeting URL (https://...)");
-    if (!newLiveSession.date || !newLiveSession.time) return toast.error("Set date and time");
-    if (!newLiveSession.title || !newLiveSession.meetingLink) return toast.error("Fill all session details");
-    const isDuplicate = existingLiveSessions.some(s => s.meetingLink === newLiveSession.meetingLink && s._id !== editingSessionId);
-    if (isDuplicate) return toast.error("This meeting link is already scheduled.");
-    try {
-      let res;
-      if (editingSessionId) {
-        res = await API.post(`/courses/${courseId}/live-session/${editingSessionId}`, newLiveSession, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success("Live Session Updated!");
-      } else {
-        res = await API.post(`/courses/${courseId}/schedule-live`, newLiveSession, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        toast.success("Live Session Scheduled!");
-      }
-      setNewLiveSession({ title: '', date: '', time: '', meetingLink: '' });
-      setEditingSessionId(null);
-      setExistingLiveSessions(res.data.sessions);
-    } catch (err) { toast.error("Operation failed"); }
-  };
+const handleAddLiveSession = async (courseId) => {
+  // 1. Validations
+  if (!newLiveSession.title.trim()) return toast.error("Enter session title");
+  if (!isValidUrl(newLiveSession.meetingLink)) return toast.error("Invalid Meeting URL");
 
+  const toastId = "live-session-sync";
+  toast.loading(editingSessionId ? "Saving changes..." : "Scheduling session...", { id: toastId });
+
+  try {
+    let res;
+    if (editingSessionId) {
+      // 🔥 THE LIKELY FIX: Change to .put and use singular 'live-session'
+      // If this still 404s, check if your backend route uses 'live-sessions' (plural)
+      res = await API.put(`/courses/${courseId}/live-session/${editingSessionId}`, newLiveSession, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Live Session Updated!", { id: toastId });
+    } else {
+      // Create new session
+      res = await API.post(`/courses/${courseId}/schedule-live`, newLiveSession, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      toast.success("Live Session Scheduled!", { id: toastId });
+    }
+
+    // 2. Reset State
+    setNewLiveSession({ title: '', date: '', time: '', meetingLink: '' });
+    setEditingSessionId(null);
+
+    // 3. Refresh List (using your confirmed GET route)
+    const refreshRes = await API.get(`/courses/${courseId}/live-session`);
+    setExistingLiveSessions(refreshRes.data);
+
+  } catch (err) {
+    console.error("Live Session Error:", err);
+    // 🔥 HELPER: This will tell you exactly what URL failed in the console
+    const failedUrl = err.config?.url;
+    const failedMethod = err.config?.method;
+    
+    toast.error(`404: The ${failedMethod.toUpperCase()} route to ${failedUrl} does not exist on your server.`, { id: toastId });
+  }
+};
   const handleEditLiveSession = (session) => {
     const formattedDate = new Date(session.date).toISOString().split('T')[0];
     setNewLiveSession({ title: session.title, meetingLink: session.meetingLink, date: formattedDate, time: session.time });

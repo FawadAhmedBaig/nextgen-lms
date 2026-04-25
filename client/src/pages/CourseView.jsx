@@ -328,15 +328,20 @@ const submitFinalQuiz = async () => {
 };
 
 const downloadCertificate = async () => {
-  const toastId = "cert-action"; // 🔥 Unique ID to prevent duplicates
+  const toastId = "cert-action"; 
   
-  toast.loading("Connecting to Polygon Blockchain...", { id: toastId });
+  // 1. Initial State: Establishing Network Handshake
+  toast.loading("Initiating Blockchain Verification...", { id: toastId });
   
   try {
     const currentUserId = user?._id || user?.id;
     if (!currentUserId) {
-      return toast.error("Re-login required.", { id: toastId });
+      return toast.error("Authentication expired. Please re-login.", { id: toastId });
     }
+
+    // 🔥 PHASE 2: Mid-request update (Visual progress for the user)
+    // We update the same toast to show we are now interacting with the Smart Contract
+    toast.loading("Minting Credentials on Polygon Proof-of-Stake...", { id: toastId });
 
     const response = await API.post('/certificate/generate', {
       userId: currentUserId, 
@@ -346,25 +351,36 @@ const downloadCertificate = async () => {
       date: new Date().toLocaleDateString()
     }, {
       responseType: 'blob', 
-      timeout: 120000 
+      timeout: 120000 // 2-minute timeout for blockchain reliability
     });
 
+    // Handle the File Download
     const blob = new Blob([response.data], { type: 'application/pdf' });
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `Certificate_${user.name.replace(/\s+/g, '_')}.pdf`);
+    link.setAttribute('download', `Verified_Certificate_${user.name.replace(/\s+/g, '_')}.pdf`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     window.URL.revokeObjectURL(url);
     
-    // 🔥 Updates the SAME toast instead of making a new one
-    toast.success("Verified on Polygon & Downloaded! 🎓", { id: toastId });
+    // 🔥 FINAL PHASE: Success with specific Polygon confirmation
+    toast.success("Transaction Mined! Certificate Downloaded 🎓", { 
+      id: toastId,
+      duration: 6000 // Give them a bit longer to read the success
+    });
     
   } catch (error) {
     console.error("Certificate Error:", error);
-    toast.error("Verification failed. Try again.", { id: toastId });
+    
+    // Check if it was a timeout or a real error
+    const isTimeout = error.code === 'ECONNABORTED';
+    const message = isTimeout 
+      ? "Blockchain is congested. Please try again in a moment." 
+      : "Verification failed. Check your connection.";
+
+    toast.error(message, { id: toastId });
   }
 };
 

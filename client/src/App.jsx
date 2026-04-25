@@ -1,6 +1,6 @@
 import React, { useEffect, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { toast } from 'react-hot-toast';
+import { toast, Toaster } from 'react-hot-toast';
 
 // --- SHARED COMPONENTS (KEEP STANDARD IMPORT) ---
 import Layout from './components/Layout'; 
@@ -45,6 +45,19 @@ const PageLoader = () => (
 function App() {
   return (
     <Router>
+      <Toaster 
+        position="top-center" 
+        reverseOrder={false} 
+        toastOptions={{
+          duration: 5000,
+          style: {
+            fontFamily: 'Plus Jakarta Sans, sans-serif',
+            borderRadius: '12px',
+            zIndex: 9999, // Ensure it's above all your dashboards
+          },
+        }} 
+      />
+      
       <ToastCleanup />
       
       {/* 🔥 Suspense boundary catches lazy-loaded chunks and shows the loader */}

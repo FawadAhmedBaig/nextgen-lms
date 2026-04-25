@@ -231,11 +231,52 @@ router.post('/:id/schedule-live', authMiddleware, validate(liveSessionSchema), a
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-router.get('/:id/live-sessions', async (req, res) => {
+router.get('/:id/live-session', async (req, res) => {
   try {
     const course = await Course.findById(req.params.id);
     res.json(course?.liveSessions || []);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// --- NEW: UPDATE SPECIFIC LIVE SESSION ---
+router.put('/:id/live-session/:sessionId', authMiddleware, validate(liveSessionSchema), async (req, res) => {
+  try {
+    const { title, date, time, meetingLink, duration } = req.body;
+    const course = await Course.findById(req.params.id);
+
+    if (!course) return res.status(404).json({ error: "Course not found" });
+
+    // Find the session in the array and update it
+    const session = course.liveSessions.id(req.params.sessionId);
+    if (!session) return res.status(404).json({ error: "Session not found" });
+
+    session.title = title;
+    session.date = date;
+    session.time = time;
+    session.meetingLink = meetingLink;
+    session.duration = duration;
+
+    await course.save();
+    res.json({ message: "Updated", sessions: course.liveSessions });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// --- NEW: DELETE SPECIFIC LIVE SESSION ---
+router.delete('/:id/live-session/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const course = await Course.findById(req.params.id);
+    if (!course) return res.status(404).json({ error: "Course not found" });
+
+    // Remove the session from the array
+    course.liveSessions.pull(req.params.sessionId);
+    
+    await course.save();
+    res.json({ message: "Deleted", sessions: course.liveSessions });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 export default router;

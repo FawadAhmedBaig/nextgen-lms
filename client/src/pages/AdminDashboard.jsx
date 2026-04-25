@@ -215,7 +215,7 @@ const fetchData = async () => {
                         {u.role === 'instructor' && u.status === 'pending' && (
                           <button onClick={() => handleApprove(u._id)} className="text-[10px] font-bold px-3 py-1.5 rounded-xl bg-blue-600 text-white shadow-md">Approve</button>
                         )}
-                        <button disabled={u.role === 'admin'} onClick={() => handleStatusToggle(u._id, u.status)} className={`text-[10px] font-bold px-3 py-1.5 rounded-xl ${u.status === 'blocked' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'} disabled:opacity-30`}>
+                        <button disabled={u.role === 'admin'} onClick={() => handleStatusToggle(u._id, u.status)} className={`text-[10px] font-bold px-3 py-1.5 cursor-pointer rounded-xl ${u.status === 'blocked' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-500'} disabled:opacity-30`}>
                           {u.status === 'blocked' ? 'Unblock' : 'Block'}
                         </button>
                       </td>
@@ -229,7 +229,7 @@ const fetchData = async () => {
                       <td className="px-8 py-6 text-xs font-medium text-slate-500">{c.category}</td>
                       <td className="px-8 py-6 text-xs font-black text-slate-900">{c.price}</td>
                       <td className="px-8 py-6 text-right">
-                        <button onClick={() => handleDeleteCourse(c._id)} className="text-xs font-bold text-red-500 hover:underline">Delete</button>
+                        <button onClick={() => handleDeleteCourse(c._id)} className="text-xs font-bold cursor-pointer text-red-500 hover:underline">Delete</button>
                       </td>
                     </tr>
                   )) : certificates.map(cert => (

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom'; // 👈 Added useLocation
 import { io } from 'socket.io-client';
-import toast, { Toaster } from 'react-hot-toast';
+import toast from 'react-hot-toast';
 import API from '../utils/api'; 
 
 const socket = io(import.meta.env.VITE_API_URL, {
@@ -119,17 +119,7 @@ const syncUser = useCallback(() => {
 
   return (
     <nav className="fixed top-0 w-full z-[100] bg-white/80 backdrop-blur-md border-b border-gray-100 font-['Plus_Jakarta_Sans']">
-      <Toaster 
-  position="top-center" 
-  reverseOrder={false} 
-  toastOptions={{
-    duration: 5000,
-    style: {
-      fontFamily: 'Plus Jakarta Sans, sans-serif',
-      borderRadius: '12px',
-    },
-  }} 
-/>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-20 items-center">
           
