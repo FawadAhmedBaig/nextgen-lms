@@ -14,9 +14,8 @@ services:
     restart: always
     ports:
       - "80:80"
-      - "443:443" # 🔥 OPEN PORT 443 FOR HTTPS
+      - "443:443" # OPEN PORT 443 FOR HTTPS
     depends_on:
-      - backend
-    # 🔥 MOUNT THE SSL CERTIFICATES FROM THE HOST
+      - backend 
     volumes:
-      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro # MOUNT THE SSL CERTIFICATES FROM THE HOST

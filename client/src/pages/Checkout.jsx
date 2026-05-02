@@ -1,65 +1,54 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { loadStripe } from '@stripe/stripe-js';
-import { Elements, CardElement, useStripe, useElements } from '@stripe/react-stripe-js';
+import { Elements } from '@stripe/react-stripe-js';
 import toast from 'react-hot-toast';
 import API from '../utils/api';
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLIC_KEY);
 
 const CheckoutForm = ({ course }) => {
-  const stripe = useStripe();
-  const elements = useElements();
   const navigate = useNavigate();
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Robust price parsing for your schema
-  const rawPrice = course.price?.toString() || "0";
-  const basePrice = parseFloat(rawPrice.replace(/[^\d.-]/g, '')) || 0;
-  const serviceFee = basePrice * 0.10;
-  const totalPrice = basePrice + serviceFee;
+  // 1. Get the user from localStorage safely
+  const storedUser = JSON.parse(localStorage.getItem('user'));
+  const studentId = storedUser?._id || storedUser?.id;
+
+  // Robust price parsing
+// Inside CheckoutForm in Checkout.jsx
+const rawPrice = course.price?.toString() || "0";
+const basePrice = parseFloat(rawPrice.replace(/[^\d.-]/g, '')) || 0;
+const serviceFee = (basePrice * 0.10) + 1; 
+const totalPrice = basePrice + serviceFee;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!stripe || !elements) return;
-
     setIsProcessing(true);
-    const loadingToast = toast.loading("Processing Payment...");
+    const loadingToast = toast.loading("Redirecting to secure payment...");
 
-try {
-      // 1. Create Payment Intent via API instance
-      const { data: { clientSecret } } = await API.post('/payments/create-intent', {
-        amount: Math.round(totalPrice * 100),
-        courseId: course._id
+    if (!studentId) {
+      setIsProcessing(false);
+      return toast.error("Please login to continue.", { id: loadingToast });
+    }
+
+    try {
+      // 2. Call backend to create the Hosted Checkout Session
+      const { data } = await API.post('/payments/create-checkout-session', {
+        amount: totalPrice,
+        courseId: course._id,
+        instructorStripeId: course.instructor?.stripeAccountId,
+        studentId: studentId, // Corrected from 'user'
+        instructorId: course.instructor?._id || course.instructor 
       });
 
-      // 2. Confirm Stripe Payment (Stripe's internal library handles this)
-      const result = await stripe.confirmCardPayment(clientSecret, {
-        payment_method: {
-          card: elements.getElement(CardElement),
-        },
-      });
-
-      if (result.error) {
-        toast.error(result.error.message, { id: loadingToast });
-      } else {
-        if (result.paymentIntent.status === 'succeeded') {
-          // 3. Complete Enrollment via API instance
-          await API.post(`/users/enroll/${course._id}`, {});
-
-          toast.success("Enrollment Successful!", { id: loadingToast });
-
-          navigate('/order-complete', { 
-            state: { 
-              course, 
-              orderId: result.paymentIntent.id 
-            } 
-          });
-        }
+      // 3. Redirect to Stripe's Hosted Checkout Page
+      if (data.url) {
+        window.location.href = data.url;
       }
     } catch (err) {
-      console.error(err);
-      toast.error("Transaction failed. Please try again.", { id: loadingToast });
+      console.error("Checkout initialization failed:", err);
+      toast.error("Failed to start checkout. Please try again.", { id: loadingToast });
     } finally {
       setIsProcessing(false);
     }
@@ -67,27 +56,23 @@ try {
 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12">
-      {/* Left Column: Payment Details */}
+      {/* Left Column: Confirmation Details */}
       <div className="lg:col-span-2 space-y-6">
         <div className="bg-white rounded-[2rem] p-6 lg:p-10 border border-slate-200 shadow-sm">
-          <h3 className="text-xl font-black text-slate-900 mb-6 lg:mb-8 uppercase tracking-widest">Card Details</h3>
-          <div className="p-5 lg:p-7 bg-slate-50 rounded-2xl border border-slate-200">
-            <CardElement options={{
-              style: {
-                base: {
-                  fontSize: '16px',
-                  color: '#1e293b',
-                  fontFamily: 'Plus Jakarta Sans, sans-serif',
-                  '::placeholder': { color: '#94a3b8' },
-                },
-              },
-            }} />
+          <h3 className="text-xl font-black text-slate-900 mb-6 lg:mb-8 uppercase tracking-widest">Enrollment Confirmation</h3>
+          
+          <div className="p-6 lg:p-8 bg-blue-50 rounded-2xl border border-blue-100 mb-6">
+            <p className="text-slate-700 font-medium leading-relaxed">
+              You are about to enroll in <span className="font-bold text-blue-700">"{course.title}"</span>. 
+              Clicking the button will redirect you to Stripe's secure payment server to complete your purchase.
+            </p>
           </div>
-          <div className="mt-6 flex items-center gap-3 text-slate-400">
-            <svg className="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+
+          <div className="flex items-center gap-3 text-slate-400">
+            <svg className="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            <p className="text-[10px] font-black uppercase tracking-widest">Secure 256-bit SSL Encrypted Payment</p>
+            <p className="text-[10px] font-black uppercase tracking-widest leading-none">Official Stripe Secure Gateway</p>
           </div>
         </div>
       </div>
@@ -100,7 +85,7 @@ try {
             <img src={course.imageUrl} className="w-20 h-20 rounded-2xl object-cover border border-white/10" alt="Thumb" />
             <div className="min-w-0">
               <h4 className="font-bold text-sm leading-tight truncate">{course.title}</h4>
-              <p className="text-slate-400 text-[10px] font-black uppercase mt-1">Instructor: {course.instructor?.name}</p>
+              <p className="text-slate-400 text-[10px] font-black uppercase mt-1">Instructor: {course.instructor?.name || 'Instructor'}</p>
             </div>
           </div>
 
@@ -110,7 +95,7 @@ try {
               <span>${basePrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-slate-400">Service Fee</span>
+              <span className="text-slate-400">Platform & Blockchain Fee</span>
               <span className="text-blue-400">+${serviceFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between items-center pt-6 border-t border-white/10 text-base">
@@ -120,10 +105,11 @@ try {
           </div>
 
           <button 
-            disabled={!stripe || isProcessing}
+            type="submit"
+            disabled={isProcessing}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white py-4 rounded-2xl font-black uppercase tracking-widest transition-all disabled:bg-slate-800 disabled:text-slate-500 cursor-pointer active:scale-95 shadow-xl shadow-blue-900/20"
           >
-            {isProcessing ? "Processing..." : "Complete Purchase"}
+            {isProcessing ? "Processing..." : "Continue to Payment"}
           </button>
         </div>
       </div>
@@ -139,12 +125,10 @@ const Checkout = () => {
 
   useEffect(() => {
     const initCheckout = async () => {
-      // 1. Check if course object is in state
       if (location.state?.course) {
         setCourse(location.state.course);
         setLoading(false);
       } 
-// 2. Fallback: Fetch from DB using API instance
       else if (location.state?.courseId) {
         try {
           const { data } = await API.get(`/courses/${location.state.courseId}`);
@@ -155,7 +139,6 @@ const Checkout = () => {
           navigate('/courses');
         }
       }
-      // 3. Error: No data at all
       else {
         toast.error("No course selected");
         navigate('/courses');

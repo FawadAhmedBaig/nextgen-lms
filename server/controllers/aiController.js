@@ -44,24 +44,20 @@ export const askTutor = async (req, res) => {
                 }
             },
             { "$unwind": "$embeddings" },
-            {
-                "$addFields": {
-                    "score": { "$meta": "vectorSearchScore" }
-                }
-            },
+            {"$addFields": {"score": { "$meta": "vectorSearchScore" }}},
             { "$sort": { "score": -1 } },
             { "$limit": 5 },
             { "$project": { "content": "$embeddings.content", "_id": 0 } }
-        ]);
+        ]); 
 
         const contextText = searchResult.length > 0 
             ? searchResult.map(r => r.content).join("\n\n") 
             : "No specific context found.";
 
-        // 5. System Prompting
-const systemInstruction = isQuizActive
-  ? "The student is taking a quiz. You are a supportive mentor. NEVER give direct answers. If they ask about a question, explain the underlying concept only."
-  : "You are an AI Tutor helping a student with their course content.";
+                // 5. System Prompting
+        const systemInstruction = isQuizActive
+        ? "The student is taking a quiz. You are a supportive mentor. NEVER give direct answers. If they ask about a question, explain the underlying concept only."
+        : "You are an AI Tutor helping a student with their course content.";
 
         // 6. Groq Completion
         const completion = await groq.chat.completions.create({
@@ -76,10 +72,10 @@ const systemInstruction = isQuizActive
             temperature: isQuizActive ? 0.7 : 0.2,
         });
 
-        res.status(200).json({ answer: completion.choices[0]?.message?.content });
+                res.status(200).json({ answer: completion.choices[0]?.message?.content });
 
-    } catch (error) {
-        console.error("❌ AskTutor Error:", error.message);
-        res.status(500).json({ error: "Server Error or Search Index Syncing." });
-    }
-};
+            } catch (error) {
+                console.error("❌ AskTutor Error:", error.message);
+                res.status(500).json({ error: "Server Error or Search Index Syncing." });
+            }
+        };

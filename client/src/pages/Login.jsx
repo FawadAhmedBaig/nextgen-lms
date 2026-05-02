@@ -36,33 +36,33 @@ const Login = () => {
     toast.dismiss();
     const loadingToast = toast.loading("Verifying credentials...");
     
-try {
-      // Hits http://152.67.7.123:5000/api/auth/login in production
-      const response = await API.post('/auth/login', { email, password });
-      
-      if (response.data.user) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('user', JSON.stringify(response.data.user));
-        
-        window.dispatchEvent(new Event('userLogin'));
+    try {
+          // Hits http://152.67.7.123:5000/api/auth/login in production
+          const response = await API.post('/auth/login', { email, password });
+          
+          if (response.data.user) {
+            localStorage.setItem('token', response.data.token);
+            localStorage.setItem('user', JSON.stringify(response.data.user));
+            
+            window.dispatchEvent(new Event('userLogin'));
 
-        const { role: userRole, name } = response.data.user;
-        
-        toast.success(`Welcome back, ${name}!`, { 
-          id: loadingToast,
-          duration: 4000 
-        });
+            const { role: userRole, name } = response.data.user;
+            
+            toast.success(`Welcome back, ${name}!`, { 
+              id: loadingToast,
+              duration: 4000 
+            });
 
-        const lowerRole = userRole.toLowerCase(); 
-        setTimeout(() => {
-          if (lowerRole === 'admin') navigate('/admin'); 
-          else if (lowerRole === 'instructor') navigate('/instructor-dashboard');
-          else navigate('/'); 
-        }, 1200);
-      }
-    } catch (err) {
-      toast.error(err.response?.data?.message || "Invalid credentials", { id: loadingToast });
-    }
+            const lowerRole = userRole.toLowerCase(); 
+            setTimeout(() => {
+              if (lowerRole === 'admin') navigate('/admin'); 
+              else if (lowerRole === 'instructor') navigate('/instructor-dashboard');
+              else navigate('/'); 
+            }, 1200);
+          }
+        } catch (err) {
+          toast.error(err.response?.data?.message || "Invalid credentials", { id: loadingToast });
+        }
   };
 
  const handleGoogleSuccess = async (credentialResponse) => {

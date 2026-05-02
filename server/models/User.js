@@ -46,7 +46,10 @@ const userSchema = new mongoose.Schema({
     enum: ['active', 'blocked', 'pending'], 
     default: 'active' 
   },
-
+  stripeAccountId: { 
+    type: String, 
+    default: null 
+},
   // --- 🔥 NEW: EMAIL VERIFICATION FIELDS ---
   isVerified: { 
     type: Boolean, 

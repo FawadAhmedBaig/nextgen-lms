@@ -105,7 +105,16 @@ router.get('/check-status/:courseId', authMiddleware, async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
+// This handles GET /api/users/profile
+router.get('/profile', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (error) {
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 router.get('/course-progress/:courseId', authMiddleware, getCourseProgress);
 router.patch('/update-progress/:courseId', authMiddleware, updateProgress);
 

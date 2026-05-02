@@ -14,6 +14,8 @@ const InstructorDashboard = () => {
   const [editingCourseId, setEditingCourseId] = useState(null);
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
+  const [transactions, setTransactions] = useState([]);
+  const [isConnectingStripe, setIsConnectingStripe] = useState(false);
   // Real-time Data States
   const [stats, setStats] = useState([
     { label: "Total Students", value: "0", icon: "👥", key: 'totalStudents' },
@@ -34,7 +36,25 @@ const InstructorDashboard = () => {
   const [loadingCourses, setLoadingCourses] = useState(false);
   const user = JSON.parse(localStorage.getItem('user'));
   const token = localStorage.getItem('token');
+  const [balance, setBalance] = useState(null);
 
+useEffect(() => {
+  if (activeTab === 'payouts') {
+    const fetchBalance = async () => {
+      try {
+        const { data } = await API.get('/payments/instructor-balance');
+        // Ensure data exists and is an object before setting state
+        if (data) {
+          setBalance(data); 
+          console.log("Stripe Data Received:", data); // Check your console!
+        }
+      } catch (err) {
+        console.error("Failed to fetch Stripe balance:", err);
+      }
+    };
+    fetchBalance();
+  }
+}, [activeTab]);
 useEffect(() => {
     // 1. Force Scroll to Top on every mount/redirect
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -209,6 +229,41 @@ const isYouTubeLink = (url) => {
     updatedModules[modIndex].items[itemIndex][field] = value;
     setCourseData({ ...courseData, modules: updatedModules });
   };
+
+  // 🔥 Add this function to handle Stripe Onboarding
+const handleConnectStripe = async () => {
+  setIsConnectingStripe(true);
+  try {
+    // If the account is already linked, get a Login Link instead of an Onboarding Link
+    const endpoint = user?.stripeAccountId 
+      ? '/payments/create-login-link' 
+      : '/payments/create-onboarding-link';
+
+    const { data } = await API.post(endpoint);
+    if (data.url) {
+      window.open(data.url, '_blank'); // Open dashboard in a new tab
+    }
+  } catch (err) {
+    toast.error("Stripe access failed.");
+  } finally {
+    setIsConnectingStripe(false);
+  }
+};
+
+// 🔥 Add this to fetch your transaction logs
+const fetchTransactions = async () => {
+  try {
+    const res = await API.get('/payments/instructor-transactions'); // Create this route in your backend
+    setTransactions(res.data);
+  } catch (err) {
+    console.error("Failed to fetch transactions");
+  }
+};
+
+// Update your useEffect to fetch logs when the Payouts tab is clicked
+useEffect(() => {
+  if (activeTab === 'payouts') fetchTransactions();
+}, [activeTab]);
 
   const handleModuleQuizChange = (modIndex, itemIndex, qIndex, field, value, optIndex = null) => {
     const updatedModules = [...courseData.modules];
@@ -567,7 +622,8 @@ const handleAddLiveSession = async (courseId) => {
           {[
             { id: 'overview', label: 'Dashboard Overview', icon: '📊' },
             { id: 'courses', label: 'Course Management', icon: '📚' },
-            { id: 'progress', label: 'Student Progress', icon: '📈' }
+            { id: 'progress', label: 'Student Progress', icon: '📈' },
+            { id: 'payouts', label: 'Payouts & Wallet', icon: '💳' }
           ].map((item) => (
             <button 
               key={item.id} 
@@ -732,6 +788,75 @@ const handleAddLiveSession = async (courseId) => {
   </div>
 )}
 
+{activeTab === 'payouts' && (
+  <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-700">
+<h2 className="text-4xl font-black italic">
+  {balance ? 
+    `$${(( (Number(balance.available) || 0) + (Number(balance.pending) || 0) ) / 100).toFixed(2)}` 
+    : "$0.00"
+  }
+  <span className="text-sm ml-2 font-bold not-italic text-slate-500 uppercase">USD</span>
+</h2>
+
+    {/* Stripe Connect Card */}
+    <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-6">
+      <div className="text-left">
+        <h3 className="text-xl font-black text-slate-900">Stripe Payout Settings</h3>
+        <p className="text-slate-400 text-sm mt-1">
+          {user?.stripeAccountId 
+            ? "Your account is linked. Funds are automatically split 90/10." 
+            : "Connect your bank account to start receiving automated payouts."}
+        </p>
+      </div>
+      <button 
+        onClick={handleConnectStripe}
+        disabled={isConnectingStripe}
+        className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 cursor-pointer"
+      >
+        {isConnectingStripe ? "Processing..." : (user?.stripeAccountId ? "View Stripe Dashboard" : "Connect Stripe (Test Mode)")}
+      </button>
+    </div>
+
+    {/* Transaction Logs Table */}
+    <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden text-left">
+      <div className="px-8 py-6 border-b border-slate-50 bg-slate-50/30">
+        <h4 className="font-black text-slate-900 text-sm uppercase tracking-widest">Transaction History</h4>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-100">
+              <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Date</th>
+              <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Course</th>
+              <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Total Paid</th>
+              <th className="px-8 py-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-blue-600">Your Share (90%)</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {transactions.length > 0 ? transactions.map((tx, idx) => (
+              <tr key={idx} className="hover:bg-slate-50/50 transition-all">
+                <td className="px-8 py-6 text-sm text-slate-500">{new Date(tx.createdAt).toLocaleDateString()}</td>
+                <td className="px-8 py-6 font-bold text-slate-900">{tx.courseId?.title || "Course Access"}</td>
+                <td className="px-8 py-6 text-sm font-medium text-slate-400">
+                   {/* 🔥 Formatted to 2 decimals */}
+                   ${tx.amount.toFixed(2)} USD
+                </td>
+                <td className="px-8 py-6 text-sm font-black text-blue-600">
+                   {/* 🔥 Formatted to 2 decimals */}
+                   ${tx.instructorNet.toFixed(2)} USD
+                </td>
+              </tr>
+            )) : (
+              <tr>
+                <td colSpan="4" className="px-8 py-20 text-center text-slate-400 font-bold italic">No payouts processed yet.</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+)}
           {activeTab === 'courses' && (
             <>
               {courseViewMode === 'list' ? (

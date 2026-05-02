@@ -9,26 +9,58 @@ const MyCourses = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+// MyCourses.jsx
 const fetchMyCourses = async () => {
-      try {
-        const token = localStorage.getItem('token');
-        
-        if (!token) {
-          toast.error("Please login to see your courses");
-          return navigate('/login');
-        }
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error("Please login to see your courses");
+      return navigate('/login');
+    }
 
-        // The API instance handles the Base URL (DuckDNS) and Auth header
-        const res = await API.get('/users/my-courses');
+    // 1. Force Sync Profile to LocalStorage
+    const profileRes = await API.get('/users/profile');
+    if (profileRes.data) {
+      localStorage.setItem('user', JSON.stringify(profileRes.data)); 
+      console.log("✅ Syncing Enrollment IDs:", profileRes.data.enrolledCourses);
+    }
 
-        setCourses(res.data);
-      } catch (err) {
-        console.error("Fetch error:", err);
-        toast.error("Failed to load your courses");
-      } finally {
-        setLoading(false);
-      }
-    };
+    // 2. Fetch Enrollment Data
+    const res = await API.get('/enrollments/my-enrollments');
+
+    if (res.data && Array.isArray(res.data)) {
+      // 🔥 FIX: Map the nested course data so the UI can read it
+      const flattenedCourses = res.data.map(enrollment => {
+        // Handle cases where the course might be null (safety check)
+        if (!enrollment.course) return null;
+
+        return {
+          ...enrollment.course, // Spreads title, imageUrl, category, etc.
+          progress: enrollment.progress || 0,
+          isCompleted: enrollment.isCompleted || false,
+          enrollmentId: enrollment._id,
+          // Ensure the _id used for navigation is the Course ID, not Enrollment ID
+          _id: enrollment.course._id 
+        };
+      }).filter(Boolean); // Removes any null entries
+
+      setCourses(flattenedCourses);
+    } else {
+      setCourses([]);
+    }
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+    if (err.response?.status === 401) {
+      localStorage.clear();
+      navigate('/login');
+    } else {
+      toast.error("Failed to load your courses");
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchMyCourses();
   }, [navigate]);

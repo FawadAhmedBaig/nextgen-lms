@@ -157,7 +157,7 @@ const getEmbedLink = (url) => {
 
   useEffect(() => {
 const fetchData = async () => {
-  setLoading(true); // Ensure loading starts as true
+  setLoading(true);
   try {
     const userStr = localStorage.getItem('user');
     const token = localStorage.getItem('token');
@@ -168,23 +168,43 @@ const fetchData = async () => {
       return navigate('/login');
     }
 
-    const storedUser = JSON.parse(userStr);
-    setUser(storedUser);
+    console.log(`📡 Initializing Workspace for Course ID: ${id}`);
 
-    console.log(`📡 Fetching Workspace for Course ID: ${id}`);
-
-    // 2. Fetch Course Data
-    // We fetch the course and user progress in parallel to save time
-    const [courseRes, progressRes] = await Promise.allSettled([
+    // 2. Fetch Data in Parallel (Now including fresh Profile sync)
+    // We add the profile fetch here so we don't rely on old localStorage data
+    const [courseRes, progressRes, profileRes] = await Promise.allSettled([
       API.get(`/courses/${id}`),
-      API.get(`/users/course-progress/${id}`)
+      API.get(`/users/course-progress/${id}`),
+      API.get(`/users/profile`) // 🔥 Added to get fresh enrolledCourses from DB
     ]);
 
-    // 3. Handle Course Result
+    // 3. Handle Profile & Enrollment Sync
+if (profileRes.status === 'fulfilled') {
+      // 1. Declare it once
+      const freshUser = profileRes.value.data; 
+      setUser(freshUser);
+      localStorage.setItem('user', JSON.stringify(freshUser));
+
+      // 2. 🛡️ THE BULLETPROOF CHECK
+      // Note: We DO NOT put 'const freshUser' here again
+      const isEnrolled = freshUser.enrolledCourses?.some(
+        (cId) => String(cId) === String(id) 
+      );
+
+      if (!isEnrolled) {
+        console.warn("Verification Failed. Requested ID:", id);
+        toast.error("Access Denied: Verification failed.");
+        return navigate('/courses'); 
+      }
+    } else {
+  setUser(freshUser);
+  localStorage.setItem('user', JSON.stringify(freshUser));
+}
+
+    // 4. Handle Course Result (Existing Logic)
     if (courseRes.status === 'fulfilled') {
       setCourse(courseRes.value.data);
     } else {
-      // If course fetch fails, we MUST stop the loading hang
       console.error("❌ Course Fetch Failed:", courseRes.reason);
       const status = courseRes.reason.response?.status;
       
@@ -200,7 +220,7 @@ const fetchData = async () => {
       }
     }
 
-    // 4. Handle Progress Result
+    // 5. Handle Progress Result (Existing Logic)
     if (progressRes.status === 'fulfilled' && progressRes.value.data) {
       setCompletedLessons(progressRes.value.data.completedLessons || []);
       if (progressRes.value.data.isCompleted) {
@@ -208,7 +228,7 @@ const fetchData = async () => {
       }
     }
 
-    // 5. Fetch Final Quiz
+    // 6. Fetch Final Quiz (Existing Logic)
     try {
       const quizRes = await API.get(`/quizzes/course/${id}`);
       setQuiz(quizRes.data);
@@ -219,7 +239,6 @@ const fetchData = async () => {
   } catch (err) {
     console.error("🔥 CRITICAL WORKSPACE ERROR:", err);
     toast.error(err.message || "Failed to initialize workspace.");
-    // If we can't get the course, we can't stay here
     setTimeout(() => navigate('/courses'), 3000);
   } finally {
     setLoading(false);

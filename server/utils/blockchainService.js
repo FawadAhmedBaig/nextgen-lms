@@ -41,43 +41,40 @@ export const issueBlockchainCert = async (studentId, courseId) => {
     const certHash = ethers.id(dataString); 
 
     console.log("📡 Sending Transaction to Polygon...");
-// 1. Fetch current gas fees from the provider
-const feeData = await provider.getFeeData();
+    // 1. Fetch current network fee data
+    const feeData = await provider.getFeeData();
 
-// 2. Calculate a "Speed Premium" (20-30% extra to jump the queue)
-// We use BigInt for precision in ethers v6
-const priorityFee = (feeData.maxPriorityFeePerGas * 130n) / 100n; 
-const maxFee = (feeData.maxFeePerGas * 150n) / 100n;
+    // 2. Calculate a "Speed Premium" (30% buffer for rapid inclusion)
+    const priorityFee = (feeData.maxPriorityFeePerGas * 130n) / 100n; 
+    const maxFee = (feeData.maxFeePerGas * 150n) / 100n;
 
-const tx = await contract.issueCertificate(certHash, sId, cId, {
-  // Let the library estimate gasLimit automatically to avoid "Out of Gas"
-  // but we provide a 10% buffer for safety
-  gasLimit: 300000, 
-  
-  // 🔥 This is the "Lightning" part: Jump to the front of the block
-  maxPriorityFeePerGas: priorityFee > ethers.parseUnits('50', 'gwei') 
-                        ? priorityFee 
-                        : ethers.parseUnits('50', 'gwei'), 
-  
-  // This ensures the transaction doesn't fail if the base fee rises
-  maxFeePerGas: maxFee > ethers.parseUnits('150', 'gwei') 
-                ? maxFee 
-                : ethers.parseUnits('150', 'gwei')
-});
+    // 3. Execution with optimized gas parameters
+    const tx = await contract.issueCertificate(certHash, sId, cId, {
+      gasLimit: 300000, 
+      
+      maxPriorityFeePerGas: priorityFee > ethers.parseUnits('50', 'gwei') 
+                            ? priorityFee 
+                            : ethers.parseUnits('50', 'gwei'), 
+      
+      // This ensures the transaction doesn't fail if the base fee rises
+      maxFeePerGas: maxFee > ethers.parseUnits('150', 'gwei') 
+                    ? maxFee 
+                    : ethers.parseUnits('150', 'gwei')
+    });
 
-// 3. Wait for 1 confirmation (Polygon is fast)
-const receipt = await tx.wait(1);
-console.log(`✅ Certificate Anchored! Block: ${receipt.blockNumber}`);
+    // 3. Wait for 1 confirmation (Polygon is fast)
+    const receipt = await tx.wait(1);
+    console.log(`✅ Certificate Anchored! Block: ${receipt.blockNumber}`);
 
-    
-    
-    console.log("⏳ Transaction Sent! Hash:", tx.hash);
-    await tx.wait(1); 
-    console.log("✅ Block Confirmed!");
+        
+        
+        console.log("⏳ Transaction Sent! Hash:", tx.hash);
+        await tx.wait(1); 
+        console.log("✅ Block Confirmed!");
 
-    return { txnHash: tx.hash, certHash };
-  } catch (error) {
-    console.error("❌ DETAILED BLOCKCHAIN ERROR:", error.message);
-    throw error; 
-  }
-};
+        return { txnHash: tx.hash, certHash };
+      } catch (error) {
+        console.error("❌ DETAILED BLOCKCHAIN ERROR:", error.message);
+        throw error; 
+      }
+    };

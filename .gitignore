@@ -6,6 +6,6 @@
 
 # Dependencies
 node_modules/
-
+stripe.exe
 # Docker
 .docker/

@@ -177,10 +177,15 @@ router.post('/create', authMiddleware, upload.fields([{ name: 'image' }, { name:
 router.get('/:id', authMiddleware, async (req, res) => {
   try {
     const course = await Course.findById(req.params.id)
-      .populate('instructor', 'name profilePicture')
-      .lean(); // We want modules and description here!
+      // 🔥 MUST include stripeAccountId here
+      .populate('instructor', 'name profilePicture stripeAccountId')
+      .lean(); 
 
     if (!course) return res.status(404).json({ error: "Course not found" });
+    
+    // Log this to your terminal to verify the data is present in the DB
+    console.log(`Course Found: ${course.title} | Stripe ID: ${course.instructor?.stripeAccountId}`);
+    
     res.json(course);
   } catch (error) {
     res.status(500).json({ error: error.message });
