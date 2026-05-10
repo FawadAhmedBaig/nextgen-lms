@@ -13,31 +13,30 @@ const OrderComplete = () => {
   // Get the Stripe Session ID from the URL
   const sessionId = searchParams.get('session_id');
 
-  useEffect(() => {
+useEffect(() => {
     const finalizeOrder = async () => {
       try {
         if (!sessionId) {
-          // If no session ID, they shouldn't be here
           navigate('/courses');
           return;
         }
 
-        // 1. Resolve the session to get the courseId (Uses your public-resolve or a payment endpoint)
-        // You can create a small backend route to return course details for a session
+        // 1. Corrected endpoint to fetch session/course data
         const { data } = await API.get(`/payments/session-status/${sessionId}`);
         
         if (data.course) {
           setCourseData(data.course);
           
-          // 2. Sync Database with Local Storage
-          // This ensures the "Start Learning" button works immediately
-          const profileRes = await API.get('/users/profile');
+          // 2. Corrected endpoint to sync user profile (auth/me)
+          const profileRes = await API.get('/auth/me');
           localStorage.setItem('user', JSON.stringify(profileRes.data));
           console.log("✅ Enrollment status synchronized!");
         }
       } catch (err) {
         console.error("❌ Finalization Error:", err);
-        toast.error("Could not verify enrollment.");
+        // If the session-status isn't ready yet, you might want to retry 
+        // or just show a more specific error
+        toast.error("Could not verify enrollment. Please check 'My Courses'.");
       } finally {
         setLoading(false);
       }

@@ -2,6 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 import toast from 'react-hot-toast';
+import { 
+  Users, 
+  BookOpenCheck, 
+  FileCheck, 
+  ShieldAlert,
+  LayoutDashboard,
+  LogOut
+} from 'lucide-react';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -134,16 +142,21 @@ const fetchData = async () => {
         {/* Navigation Menu */}
         <nav className="flex-1 px-6 pt-4 space-y-2 overflow-y-auto">
           {[
-            { id: 'users', label: 'User Management', icon: '👥' },
-            { id: 'courses', label: 'Course Moderation', icon: '📚' },
-            { id: 'certificates', label: 'Issued Certificates', icon: '📜' }
+            { id: 'users', label: 'User Management', icon: <Users size={20} /> },
+            { id: 'courses', label: 'Course Moderation', icon: <BookOpenCheck size={20} /> },
+            { id: 'certificates', label: 'Issued Certificates', icon: <FileCheck size={20} /> }
           ].map((tab) => (
             <button 
               key={tab.id}
               onClick={() => { setActiveTab(tab.id); setIsSidebarOpen(false); }} 
-              className={`w-full flex items-center gap-4 p-5 rounded-[1.5rem] font-bold text-sm transition-all cursor-pointer ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-[1.02]' : 'text-slate-400 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-4 p-5 rounded-[1.5rem] font-bold text-sm transition-all cursor-pointer 
+                ${activeTab === tab.id 
+                  ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-[1.02]' 
+                  : 'text-slate-400 hover:bg-slate-50'}`}
             >
-              <span className="text-xl">{tab.icon}</span>
+              <span className={activeTab === tab.id ? 'text-white' : 'text-slate-400'}>
+                {tab.icon}
+              </span>
               {tab.label}
             </button>
           ))}
@@ -156,8 +169,9 @@ const fetchData = async () => {
             <p className="text-sm font-bold truncate">{adminUser?.name || 'System Admin'}</p>
             <button 
               onClick={() => { localStorage.clear(); navigate('/login'); }} 
-              className="mt-4 w-full py-3 bg-white/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border border-white/5"
+              className="mt-4 w-full py-3 bg-white/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border border-white/5 flex items-center justify-center gap-2"
             >
+              <LogOut size={14} />
               Sign Out
             </button>
           </div>
@@ -173,18 +187,26 @@ const fetchData = async () => {
 
         <div className="p-6 lg:p-10 max-w-7xl mx-auto">
           {/* STATS CARDS */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-10">
-            {[
-              { label: 'Total Users', val: stats.totalUsers, color: 'text-slate-900' },
-              { label: 'Instructors', val: stats.instructors, color: 'text-blue-600' },
-              { label: 'Students', val: stats.students, color: 'text-green-600' }
-            ].map((stat, i) => (
-              <div key={i} className="bg-white p-6 lg:p-8 rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm">
-                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
-                <p className={`text-2xl lg:text-3xl font-black ${stat.color}`}>{stat.val}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6 mb-10">
+          {[
+            { label: 'Total Users', val: stats.totalUsers, color: 'blue', icon: <Users size={20} /> },
+            { label: 'Instructors', val: stats.instructors, color: 'indigo', icon: <ShieldAlert size={20} /> },
+            { label: 'Students', val: stats.students, color: 'green', icon: <Users size={20} /> }
+          ].map((stat, i) => (
+            <div key={i} className="bg-white p-6 lg:p-8 rounded-[2rem] border border-slate-100 shadow-sm flex flex-col gap-4">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center 
+                ${stat.color === 'blue' ? 'bg-blue-50 text-blue-600' : 
+                  stat.color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 
+                  'bg-green-50 text-green-600'}`}>
+                {stat.icon}
               </div>
-            ))}
-          </div>
+              <div>
+                <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
+                <p className="text-2xl lg:text-3xl font-black text-slate-900">{stat.val}</p>
+              </div>
+            </div>
+          ))}
+        </div>
 
           {/* DATA TABLE (Horizontal scroll container) */}
           <div className="bg-white rounded-[2rem] lg:rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">

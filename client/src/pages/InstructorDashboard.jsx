@@ -3,6 +3,17 @@ import { Link, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
 import toast from 'react-hot-toast';
 import { useLocation } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  BookOpen, 
+  TrendingUp, 
+  Wallet, 
+  LogOut,
+  Users,
+  DollarSign,
+  ShieldCheck,
+  Cpu,
+} from 'lucide-react';
 
 const InstructorDashboard = () => {
   const navigate = useNavigate();
@@ -16,16 +27,14 @@ const InstructorDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [transactions, setTransactions] = useState([]);
   const [isConnectingStripe, setIsConnectingStripe] = useState(false);
-  // Real-time Data States
-  const [stats, setStats] = useState([
-    { label: "Total Students", value: "0", icon: "👥", key: 'totalStudents' },
-    { label: "Revenue", value: "$0", icon: "💰", key: 'totalRevenue' },
-    { label: "Blockchain Certs", value: "0", icon: "⛓️", key: 'totalCerts' },
-    { label: "AI Queries", value: "0", icon: "🤖", key: 'totalAiQueries' },
-  ]);
   const [studentProgress, setStudentProgress] = useState([]);
   const [loadingStats, setLoadingStats] = useState(false);
-
+  const menuItems = [
+  { id: 'overview', label: 'Dashboard Overview', icon: <LayoutDashboard size={20} /> },
+  { id: 'courses', label: 'Course Management', icon: <BookOpen size={20} /> },
+  { id: 'progress', label: 'Student Progress', icon: <TrendingUp size={20} /> },
+  { id: 'payouts', label: 'Payouts & Wallet', icon: <Wallet size={20} /> }
+  ];
   // Mobile Sidebar State
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -35,8 +44,14 @@ const InstructorDashboard = () => {
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [loadingCourses, setLoadingCourses] = useState(false);
   // Replace your current 'const user = ...' with this:
-const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
-const user = currentUser;
+  const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
+  const user = currentUser;
+  const [dashboardStats, setDashboardStats] = useState({
+    totalStudents: 0,
+    totalRevenue: 0,
+    totalCerts: 0,
+    totalAiQueries: 0
+  });
 // Update the sync function to use this state:
 
   const token = localStorage.getItem('token');
@@ -86,30 +101,18 @@ useEffect(() => {
 const fetchDashboardData = async () => {
     if (!token || !user) return;
     setLoadingStats(true);
-    
     try {
-      // 1. Fetch Instructor Stats 
-      // 🔥 FIX: We remove the manual query string and let the auth token handle identity
       const statsRes = await API.get(`/instructor/stats`);
+      setDashboardStats(statsRes.data); // 🔥 Save the data here
       
-      const data = statsRes.data;
-      const updatedStats = stats.map(s => ({
-        ...s,
-        value: s.key === 'totalRevenue' ? `$${data[s.key] || 0}` : (data[s.key] || 0)
-      }));
-      setStats(updatedStats);
-
-      // 2. Fetch Student Progress
-      // 🔥 FIX: Same here, use the protected route
       const progressRes = await API.get(`/instructor/student-progress`);
       setStudentProgress(progressRes.data);
     } catch (err) {
       console.error("Dashboard sync error", err);
-      // Optional: toast.error("Stats sync failed");
     } finally {
       setLoadingStats(false);
     }
-  };
+};
   // Add this new useEffect near your other effects
 useEffect(() => {
   const syncUserStatus = async () => {
@@ -658,12 +661,7 @@ const handleAddLiveSession = async (courseId) => {
 
         {/* Navigation Menu */}
         <nav className="flex-1 px-6 pt-4 space-y-2 overflow-y-auto">
-          {[
-            { id: 'overview', label: 'Dashboard Overview', icon: '📊' },
-            { id: 'courses', label: 'Course Management', icon: '📚' },
-            { id: 'progress', label: 'Student Progress', icon: '📈' },
-            { id: 'payouts', label: 'Payouts & Wallet', icon: '💳' }
-          ].map((item) => (
+          {menuItems.map((item) => (
             <button 
               key={item.id} 
               onClick={() => { 
@@ -671,9 +669,15 @@ const handleAddLiveSession = async (courseId) => {
                 if (activeTab !== 'courses') setCourseViewMode('list'); 
                 setIsSidebarOpen(false); 
               }} 
-              className={`w-full flex items-center gap-4 p-5 rounded-[1.5rem] font-bold text-sm transition-all cursor-pointer ${activeTab === item.id ? 'bg-blue-600 text-white shadow-xl shadow-blue-200 scale-[1.02]' : 'text-slate-400 hover:bg-slate-50'}`}
+              className={`w-full flex items-center gap-4 px-6 py-4 rounded-2xl font-semibold text-sm transition-all duration-200 cursor-pointer
+                ${activeTab === item.id 
+                  ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 translate-x-1' 
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                }`}
             >
-              <span className="text-xl">{item.icon}</span>
+              <span className={`${activeTab === item.id ? 'text-white' : 'text-slate-400'}`}>
+                {item.icon}
+              </span>
               {item.label}
             </button>
           ))}
@@ -686,10 +690,12 @@ const handleAddLiveSession = async (courseId) => {
             <p className="text-base font-bold truncate">{user?.name}</p>
             <button 
               onClick={() => { localStorage.clear(); navigate('/login'); }} 
-              className="mt-4 w-full py-3 bg-red-500/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border border-red-500/20"
+              className="mt-4 w-full py-3 bg-white/10 hover:bg-red-500 text-red-400 hover:text-white rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer border border-white/5 flex items-center justify-center gap-2"
             >
-              Sign Out Securely
+              <LogOut size={14} />
+              Sign Out
             </button>
+            
           </div>
         </div>
       </div>
@@ -710,17 +716,36 @@ const handleAddLiveSession = async (courseId) => {
 
         <div className="p-4 lg:p-10 max-w-7xl mx-auto">
           {/* DASHBOARD OVERVIEW */}
-          {activeTab === 'overview' && (
-             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-10">
-                {stats.map((stat, i) => (
-                <div key={i} className="bg-white p-6 lg:p-8 rounded-[2rem] border border-slate-100 shadow-sm animate-in fade-in duration-500">
-                    <span className="text-xl mb-2 lg:mb-4 block">{stat.icon}</span>
-                    <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
-                    <p className="text-xl lg:text-3xl font-black text-slate-900">{loadingStats ? "..." : stat.value}</p>
+        {/* DASHBOARD OVERVIEW */}
+        {activeTab === 'overview' && (() => {
+          // Define stats locally here based on the dashboardStats state
+          const statsCards = [
+            { label: "Total Students", value: dashboardStats.totalStudents, icon: <Users size={24} />, color: "blue" },
+            { label: "Revenue", value: `$${Number(dashboardStats.totalRevenue).toFixed(2)}`, icon: <DollarSign size={24} />, color: "emerald" },
+            { label: "Blockchain Certs", value: dashboardStats.totalCerts, icon: <ShieldCheck size={24} />, color: "indigo" },
+            { label: "AI Queries", value: dashboardStats.totalAiQueries, icon: <Cpu size={24} />, color: "amber" },
+          ];
+
+          return (
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              {statsCards.map((stat, i) => (
+                <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-sm hover:shadow-md transition-all duration-300">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-6 
+                    ${stat.color === 'blue' ? 'bg-blue-50 text-blue-600' : 
+                      stat.color === 'emerald' ? 'bg-emerald-50 text-emerald-600' : 
+                      stat.color === 'indigo' ? 'bg-indigo-50 text-indigo-600' : 
+                      'bg-amber-50 text-amber-600'}`}>
+                    {stat.icon}
+                  </div>
+                  <p className="text-[10px] font-black uppercase text-slate-400 tracking-widest mb-1">{stat.label}</p>
+                  <p className="text-2xl lg:text-3xl font-black text-slate-900">
+                    {loadingStats ? "..." : stat.value}
+                  </p>
                 </div>
-                ))}
+              ))}
             </div>
-          )}
+          );
+        })()}
 
           {/* STUDENT PROGRESS TAB */}
 {/* STUDENT PROGRESS TAB - Desktop Optimized & Mobile Responsive */}
