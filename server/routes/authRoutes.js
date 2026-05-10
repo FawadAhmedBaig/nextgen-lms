@@ -373,7 +373,7 @@ router.post('/google-login', async (req, res) => {
     );
 
     // 5. Success Response
-    res.json({
+res.json({
       token,
       user: {
         id: user._id,
@@ -381,8 +381,10 @@ router.post('/google-login', async (req, res) => {
         email: user.email,
         role: user.role,
         status: user.status,
-        isVerified: user.isVerified, // Include in response
-        profilePicture: user.profilePicture
+        isVerified: user.isVerified,
+        profilePicture: user.profilePicture,
+        // 🔥 ADD THIS LINE:
+        stripeAccountId: user.stripeAccountId || null 
       }
     });
 
@@ -393,6 +395,7 @@ router.post('/google-login', async (req, res) => {
 });
 router.get('/me', authMiddleware, async (req, res) => {
   try {
+    // Ensure stripeAccountId is included in the selection
     const user = await User.findById(req.user.id).select('-password_hash');
     res.json(user);
   } catch (err) {

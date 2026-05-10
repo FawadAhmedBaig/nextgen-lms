@@ -34,7 +34,11 @@ const InstructorDashboard = () => {
   const [existingLiveSessions, setExistingLiveSessions] = useState([]);
   const [editingSessionId, setEditingSessionId] = useState(null);
   const [loadingCourses, setLoadingCourses] = useState(false);
-  const user = JSON.parse(localStorage.getItem('user'));
+  // Replace your current 'const user = ...' with this:
+const [currentUser, setCurrentUser] = useState(JSON.parse(localStorage.getItem('user')));
+const user = currentUser;
+// Update the sync function to use this state:
+
   const token = localStorage.getItem('token');
   const [balance, setBalance] = useState(null);
 
@@ -106,13 +110,42 @@ const fetchDashboardData = async () => {
       setLoadingStats(false);
     }
   };
+  // Add this new useEffect near your other effects
+useEffect(() => {
+  const syncUserStatus = async () => {
+    try {
+      // Assuming you have a profile or "me" endpoint that returns latest user data
+      const { data } = await API.get('/auth/me');
+      if (data) {
+        // Update localStorage with the fresh data from DB (includes stripeAccountId)
+        localStorage.setItem('user', JSON.stringify(data));
+        // Note: You might need to force a re-render if the 'user' variable 
+        // doesn't update automatically. See step 2.
+      }
+    } catch (err) {
+      console.error("Failed to sync user status:", err);
+    }
+  };
 
+  if (token) syncUserStatus();
+}, [token]);
   useEffect(() => {
     fetchDashboardData();
     const interval = setInterval(fetchDashboardData, 30000);
     return () => clearInterval(interval);
   }, []);
-
+useEffect(() => {
+  const syncUserStatus = async () => {
+    try {
+      const { data } = await API.get('/auth/me'); 
+      if (data) {
+        localStorage.setItem('user', JSON.stringify(data));
+        setCurrentUser(data); // This triggers the UI update!
+      }
+    } catch (err) { console.error(err); }
+  };
+  syncUserStatus();
+}, []);
   useEffect(() => {
     if (activeTab === 'courses') fetchMyCourses();
   }, [activeTab]);
@@ -234,16 +267,22 @@ const isYouTubeLink = (url) => {
 const handleConnectStripe = async () => {
   setIsConnectingStripe(true);
   try {
-    // If the account is already linked, get a Login Link instead of an Onboarding Link
-    const endpoint = user?.stripeAccountId 
+    // 🔥 Check if the CURRENT user from state has an ID
+    const hasStripeId = currentUser?.stripeAccountId;
+
+    // Switch endpoints based on status
+    const endpoint = hasStripeId 
       ? '/payments/create-login-link' 
       : '/payments/create-onboarding-link';
 
     const { data } = await API.post(endpoint);
+    
     if (data.url) {
-      window.open(data.url, '_blank'); // Open dashboard in a new tab
+      // If it's a dashboard link, opening in the same tab or new tab is fine
+      window.open(data.url, '_blank'); 
     }
   } catch (err) {
+    console.error("Stripe Error:", err);
     toast.error("Stripe access failed.");
   } finally {
     setIsConnectingStripe(false);
@@ -813,7 +852,9 @@ const handleAddLiveSession = async (courseId) => {
         disabled={isConnectingStripe}
         className="px-8 py-4 bg-blue-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 cursor-pointer"
       >
-        {isConnectingStripe ? "Processing..." : (user?.stripeAccountId ? "View Stripe Dashboard" : "Connect Stripe (Test Mode)")}
+          {isConnectingStripe 
+          ? "Processing..." 
+          : (currentUser?.stripeAccountId ? "View Stripe Dashboard" : "Connect Stripe (Test Mode)")}
       </button>
     </div>
 
