@@ -149,6 +149,20 @@ router.post('/create-checkout-session', async (req, res) => {
   }
 });
 
+router.get('/session-status/:sessionId', authMiddleware, async (req, res) => {
+  try {
+    const session = await stripe.checkout.sessions.retrieve(req.params.sessionId);
+    
+    // Assuming you stored the courseId in metadata when creating the session
+    const courseId = session.metadata.courseId;
+    const course = await Course.findById(courseId);
+
+    res.json({ status: session.status, course });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // --- 4. UNIFIED WEBHOOK ---
 router.post('/webhook', express.raw({type: 'application/json'}), async (req, res) => {
   const sig = req.headers['stripe-signature'];
